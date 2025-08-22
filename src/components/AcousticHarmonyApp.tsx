@@ -16,8 +16,9 @@ import { DeviceList } from "@/components/DeviceList";
 import { PlaybackControls } from "@/components/PlaybackControls";
 import { Scheduling } from "@/components/Scheduling";
 import { Settings } from "@/components/Settings";
+import { Playlist } from "@/components/Playlist";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { Device, Schedule, Track } from "@/lib/types";
+import type { Device, Schedule, Track, Playlist as PlaylistType } from "@/lib/types";
 import { Speaker } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -39,6 +40,8 @@ export default function AcousticHarmonyApp() {
   const [selectedDeviceId, setSelectedDeviceId] = React.useState<string | null>(null);
   const [schedules, setSchedules] = React.useState<Schedule[]>([]);
   const [track, setTrack] = React.useState<Track | null>(null);
+  const [playlists, setPlaylists] = React.useState<PlaylistType[]>([]);
+  const [availableTracks, setAvailableTracks] = React.useState<Track[]>([]);
   const [playbackState, setPlaybackState] = React.useState({
     isPlaying: false,
     progress: 0, 
@@ -92,6 +95,28 @@ export default function AcousticHarmonyApp() {
   const handleToggleSchedule = (scheduleId: string, enabled: boolean) => {
     setSchedules(prev => prev.map(s => s.id === scheduleId ? { ...s, enabled } : s));
   };
+  
+  const handleSavePlaylist = (playlist: PlaylistType) => {
+    setPlaylists(prev => {
+        const existing = prev.find(p => p.id === playlist.id);
+        if (existing) {
+            return prev.map(p => p.id === playlist.id ? playlist : p);
+        }
+        return [...prev, playlist];
+    });
+    toast({
+        title: "Playlist Saved",
+        description: `Playlist "${playlist.name}" has been saved.`,
+    });
+  };
+
+  const handleDeletePlaylist = (playlistId: string) => {
+      setPlaylists(prev => prev.filter(p => p.id !== playlistId));
+      toast({
+          title: "Playlist Deleted",
+          description: "The playlist has been removed.",
+      });
+  };
 
 
   return (
@@ -116,8 +141,9 @@ export default function AcousticHarmonyApp() {
             <AppHeader />
             <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
                 <Tabs defaultValue="player" className="w-full">
-                    <TabsList className="grid w-full grid-cols-2 max-w-md mx-auto">
+                    <TabsList className="grid w-full grid-cols-3 max-w-lg mx-auto">
                         <TabsTrigger value="player">Player</TabsTrigger>
+                        <TabsTrigger value="playlists">Playlists</TabsTrigger>
                         <TabsTrigger value="schedules">Schedules</TabsTrigger>
                     </TabsList>
                     <TabsContent value="player" className="mt-6">
@@ -136,6 +162,14 @@ export default function AcousticHarmonyApp() {
                                 <Settings device={selectedDevice}/>
                             </div>
                         </div>
+                    </TabsContent>
+                    <TabsContent value="playlists" className="mt-6">
+                        <Playlist
+                            playlists={playlists}
+                            availableTracks={availableTracks}
+                            onSave={handleSavePlaylist}
+                            onDelete={handleDeletePlaylist}
+                        />
                     </TabsContent>
                     <TabsContent value="schedules" className="mt-6">
                         <Scheduling

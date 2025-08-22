@@ -6,6 +6,7 @@ export interface Device {
 }
 
 export interface Track {
+  id: string;
   title: string;
   artist: string;
   albumArtUrl: string;
@@ -21,4 +22,10 @@ export interface Schedule {
   action: ScheduleAction;
   playlist: string;
   enabled: boolean;
+}
+
+export interface Playlist {
+  id: string;
+  name: string;
+  trackIds: string[];
 }
