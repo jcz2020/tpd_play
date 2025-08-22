@@ -21,26 +21,6 @@ import type { Device, Schedule, Track } from "@/lib/types";
 import { Speaker } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-const initialDevices: Device[] = [
-  { id: "1", name: "B&O A9 Gen 2 (Living Room)", ip: "192.168.1.10", online: true },
-  { id: "2", name: "Beosound Level (Kitchen)", ip: "192.168.1.12", online: true },
-  { id: "3", name: "Beosound Emerge (Office)", ip: "192.168.1.15", online: false },
-  { id: "4", name: "Beoplay A1 (Patio)", ip: "192.168.1.20", online: true },
-];
-
-const initialSchedules: Schedule[] = [
-    { id: '1', deviceId: '1', time: '07:00', action: 'on', playlist: 'Morning Jazz', enabled: true },
-    { id: '2', deviceId: '1', time: '23:00', action: 'off', playlist: '', enabled: true },
-    { id: '3', deviceId: '2', time: '18:00', action: 'on', playlist: 'Dinner Party Mix', enabled: false },
-];
-
-const initialTrack: Track = {
-  title: "Horizon's Whisper",
-  artist: "AuraPulse",
-  albumArtUrl: "https://placehold.co/300x300.png",
-  duration: 245,
-};
-
 function AppHeader() {
   const { isMobile } = useSidebar();
   return (
@@ -55,13 +35,13 @@ function AppHeader() {
 }
 
 export default function AcousticHarmonyApp() {
-  const [devices, setDevices] = React.useState<Device[]>(initialDevices);
-  const [selectedDeviceId, setSelectedDeviceId] = React.useState<string | null>(initialDevices.find(d => d.online)?.id ?? null);
-  const [schedules, setSchedules] = React.useState<Schedule[]>(initialSchedules);
-  const [track, setTrack] = React.useState<Track>(initialTrack);
+  const [devices, setDevices] = React.useState<Device[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = React.useState<string | null>(null);
+  const [schedules, setSchedules] = React.useState<Schedule[]>([]);
+  const [track, setTrack] = React.useState<Track | null>(null);
   const [playbackState, setPlaybackState] = React.useState({
     isPlaying: false,
-    progress: 60, // in seconds
+    progress: 0, 
     volume: 75,
   });
 
