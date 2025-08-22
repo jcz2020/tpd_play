@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -22,6 +23,18 @@ import type { Device, Schedule, Track, Playlist as PlaylistType } from "@/lib/ty
 import { Speaker } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+const MOCK_DEVICES: Device[] = [
+    { id: '1', name: 'Living Room Speaker', ip: '192.168.1.100', online: true },
+    { id: '2', name: 'Bedroom Speaker', ip: '192.168.1.101', online: false },
+    { id: '3', name: 'Kitchen Speaker', ip: '192.168.1.102', online: true },
+];
+
+const MOCK_TRACKS: Track[] = [
+    { id: 't1', title: 'Bohemian Rhapsody', artist: 'Queen', albumArtUrl: 'https://placehold.co/300x300.png', duration: 355 },
+    { id: 't2', title: 'Stairway to Heaven', artist: 'Led Zeppelin', albumArtUrl: 'https://placehold.co/300x300.png', duration: 482 },
+    { id: 't3', title: 'Hotel California', artist: 'Eagles', albumArtUrl: 'https://placehold.co/300x300.png', duration: 391 },
+];
+
 function AppHeader() {
   const { isMobile } = useSidebar();
   return (
@@ -36,15 +49,15 @@ function AppHeader() {
 }
 
 export default function AcousticHarmonyApp() {
-  const [devices, setDevices] = React.useState<Device[]>([]);
-  const [selectedDeviceId, setSelectedDeviceId] = React.useState<string | null>(null);
+  const [devices, setDevices] = React.useState<Device[]>(MOCK_DEVICES);
+  const [selectedDeviceId, setSelectedDeviceId] = React.useState<string | null>(MOCK_DEVICES[0]?.id ?? null);
   const [schedules, setSchedules] = React.useState<Schedule[]>([]);
-  const [track, setTrack] = React.useState<Track | null>(null);
+  const [track, setTrack] = React.useState<Track | null>(MOCK_TRACKS[0]);
   const [playlists, setPlaylists] = React.useState<PlaylistType[]>([]);
-  const [availableTracks, setAvailableTracks] = React.useState<Track[]>([]);
+  const [availableTracks, setAvailableTracks] = React.useState<Track[]>(MOCK_TRACKS);
   const [playbackState, setPlaybackState] = React.useState({
     isPlaying: false,
-    progress: 0, 
+    progress: 60, 
     volume: 75,
   });
 
@@ -52,8 +65,87 @@ export default function AcousticHarmonyApp() {
 
   const selectedDevice = devices.find(d => d.id === selectedDeviceId);
 
+  React.useEffect(() => {
+    if (!selectedDevice || !selectedDevice.online) {
+      return;
+    }
+
+    const abortController = new AbortController();
+    const signal = abortController.signal;
+    let isMounted = true;
+
+    const fetchNotifications = async () => {
+        let lastNotificationId: string | null = null;
+        while (isMounted) {
+            try {
+                // In a real app, you would use the device's IP. 
+                // We will use a placeholder API for demonstration.
+                // The B&O endpoint is /BeoNotify, but we use a mock service.
+                const url = `https://jsonplaceholder.typicode.com/posts/${(Math.floor(Math.random() * 100) + 1)}?_=${Date.now()}`;
+                
+                const response = await fetch(url, { signal });
+                
+                if (!response.ok) {
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                    continue;
+                }
+
+                const notification = await response.json();
+                
+                if (signal.aborted) break;
+
+                // Simulate different notification types
+                const randomNotificationType = Math.random();
+                if (randomNotificationType < 0.33) {
+                    // Simulate volume change
+                    const newVolume = Math.floor(Math.random() * 101);
+                    console.log('Received volume notification:', newVolume);
+                    setPlaybackState(prev => ({ ...prev, volume: newVolume }));
+                } else if (randomNotificationType < 0.66) {
+                    // Simulate progress change
+                    const newProgress = Math.floor(Math.random() * (track?.duration ?? 300));
+                    const newIsPlaying = Math.random() > 0.5;
+                    console.log('Received progress notification:', { progress: newProgress, isPlaying: newIsPlaying });
+                    setPlaybackState(prev => ({ ...prev, progress: newProgress, isPlaying: newIsPlaying }));
+                } else {
+                    // Simulate track change
+                    const newTrack = MOCK_TRACKS[Math.floor(Math.random() * MOCK_TRACKS.length)];
+                    console.log('Received nowPlaying notification:', newTrack.title);
+                    setTrack(newTrack);
+                }
+
+
+            } catch (error) {
+                if (signal.aborted) {
+                    console.log('Notification fetch aborted.');
+                    break;
+                }
+                console.error("Notification stream error:", error);
+                // Wait before retrying
+                await new Promise(resolve => setTimeout(resolve, 5000));
+            }
+        }
+    };
+
+    fetchNotifications();
+
+    return () => {
+        isMounted = false;
+        abortController.abort();
+    };
+}, [selectedDeviceId, selectedDevice, track?.duration]);
+
+
   const handleSelectDevice = (deviceId: string) => {
     setSelectedDeviceId(deviceId);
+    const device = devices.find(d => d.id === deviceId);
+    if (device && device.online) {
+        // Reset state for new device
+        setPlaybackState({ isPlaying: false, progress: 0, volume: 75 });
+        setTrack(MOCK_TRACKS[0] ?? null);
+    } else {
+        setTrack(null);
+    }
   };
 
   const handleTogglePlay = () => {
@@ -187,3 +279,5 @@ export default function AcousticHarmonyApp() {
     </SidebarProvider>
   );
 }
+
+    

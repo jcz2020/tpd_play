@@ -58,6 +58,7 @@ export function PlaybackControls({
 
   const isDeviceOnline = !!device?.online;
   const trackDuration = track?.duration ?? 0;
+  const currentProgress = Math.min(playbackState.progress, trackDuration);
 
   return (
     <Card className={cn(!isDeviceOnline && "bg-muted/50")}>
@@ -76,9 +77,10 @@ export function PlaybackControls({
                     fill
                     className={cn("rounded-lg object-cover shadow-lg", !isDeviceOnline && "grayscale")}
                     data-ai-hint="album cover"
+                    unoptimized
                 />
             ) : (
-                <div className={cn("rounded-lg flex items-center justify-center bg-muted", !isDeviceOnline && "grayscale")}>
+                <div className={cn("rounded-lg flex items-center justify-center bg-muted aspect-square", !isDeviceOnline && "grayscale")}>
                     <Music className="w-24 h-24 text-muted-foreground" />
                 </div>
             )}
@@ -91,14 +93,14 @@ export function PlaybackControls({
 
         <div className="w-full space-y-2">
           <Slider
-            value={[playbackState.progress]}
+            value={[currentProgress]}
             max={trackDuration}
             step={1}
             onValueChange={onProgressChange}
             disabled={!isDeviceOnline || !track}
           />
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{formatTime(playbackState.progress)}</span>
+            <span>{formatTime(currentProgress)}</span>
             <span>{formatTime(trackDuration)}</span>
           </div>
         </div>
@@ -131,3 +133,5 @@ export function PlaybackControls({
     </Card>
   );
 }
+
+    

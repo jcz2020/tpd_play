@@ -8,7 +8,7 @@ import type { Device } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "./ui/separator";
 import { useState } from "react";
-import { Loader2, FolderScan } from "lucide-react";
+import { Loader2, FolderSync } from "lucide-react";
 
 interface SettingsProps {
     device?: Device;
@@ -59,7 +59,7 @@ export function Settings({ device }: SettingsProps) {
                         <div className="flex gap-2">
                             <Input id="music-folder" placeholder="/path/to/your/music" />
                             <Button onClick={handleScan} disabled={isScanning} variant="outline" size="icon">
-                                {isScanning ? <Loader2 className="animate-spin" /> : <FolderScan />}
+                                {isScanning ? <Loader2 className="animate-spin" /> : <FolderSync />}
                                 <span className="sr-only">Scan Folder</span>
                             </Button>
                         </div>
