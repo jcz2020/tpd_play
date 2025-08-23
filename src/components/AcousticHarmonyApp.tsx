@@ -33,6 +33,7 @@ import {
     getAvailableTracks,
     scanMusicFolders as scanDeviceMusicFolders
 } from "@/lib/actions";
+import { randomUUID } from "crypto";
 
 export interface AppState {
     devices: Device[];
@@ -246,7 +247,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
                     let track: Track | null = null;
                     if (apiTrack && apiTrack.title) {
                         track = {
-                            id: apiTrack.id ?? randomUUID(),
+                            id: apiTrack.id ?? playbackState.track?.id ?? '',
                             title: apiTrack.title,
                             artist: apiTrack.artist ?? 'Unknown Artist',
                             albumArtUrl: apiTrack.art?.url || 'https://placehold.co/300x300.png',
@@ -290,7 +291,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
         console.log(`Aborting notification listener for ${selectedDevice.name}.`);
         abortController.abort();
     };
-  }, [selectedDevice]);
+  }, [selectedDevice, playbackState.track?.id]);
 
 
   const handleSelectDevice = (deviceId: string) => {
