@@ -139,7 +139,11 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
                 }
 
 
-            } catch (error) {
+            } catch (error: any) {
+                if (error.name === 'AbortError') {
+                    console.log('Notification fetch aborted.');
+                    break;
+                }
                 if (signal.aborted) {
                     console.log('Notification fetch aborted.');
                     break;
