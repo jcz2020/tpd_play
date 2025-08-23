@@ -14,7 +14,7 @@ const beoApi = {
       if (!response.ok) {
         // A real app would have more robust error handling
         console.error(`API GET request to http://${ip}/${path} failed with status ${response.status}`);
-        // Return a default/empty state on failure to prevent crashes
+        // Return an empty object on failure to prevent crashes
         return {}; 
       }
       try {
@@ -103,7 +103,11 @@ export async function getAvailableSources(deviceId: string, ip: string): Promise
         const data = await beoApi.get(ip, 'BeoZone/Zone/Sources');
         // The real API returns a complex object. We need to map it to our Source type.
         // This is a simplified mapping based on potential B&O API structure.
-        return Object.entries(data.sources ?? {}).map(([id, source]: [string, any]) => ({
+        if (!data || !data.sources) {
+            console.warn(`No sources data received from ${ip}`);
+            return [];
+        }
+        return Object.entries(data.sources).map(([id, source]: [string, any]) => ({
             id: source.id,
             name: source.friendlyName,
             type: source.type,
@@ -116,26 +120,38 @@ export async function getAvailableSources(deviceId: string, ip: string): Promise
 
 export async function getPlaybackState(deviceId: string, ip: string): Promise<PlaybackState> {
     try {
-      const data = await beoApi.get(ip, 'BeoZone/Zone/Stream');
-      const volumeData = await beoApi.get(ip, 'BeoDevice/settings/volume');
+      // Fetch both stream and volume data in parallel for efficiency
+      const [streamData, volumeData] = await Promise.all([
+        beoApi.get(ip, 'BeoZone/Zone/Stream'),
+        beoApi.get(ip, 'BeoDevice/settings/volume')
+      ]);
+
+      // Check for empty or invalid responses
+      if (Object.keys(streamData).length === 0 && Object.keys(volumeData).length === 0) {
+        throw new Error("Failed to get any valid data from device.");
+      }
       
+      // The track object from the API
+      const apiTrack = streamData.track;
+
       return {
-        state: data.state ?? "stopped",
-        progress: data.progress ?? 0,
+        state: streamData.state ?? "stopped",
+        progress: streamData.progress ?? 0,
         volume: volumeData.level ?? 50,
-        source: data.source?.id ?? "local",
-        playMode: data.playMode ?? 'sequential', // This needs mapping from the real API
-        track: data.track ? {
-            id: data.track.id,
-            title: data.track.title,
-            artist: data.track.artist,
-            albumArtUrl: data.track.albumArtUrl ?? 'https://placehold.co/300x300.png',
-            duration: data.track.duration ?? 0,
-        } : null,
+        source: streamData.source?.id ?? "local",
+        playMode: streamData.playMode ?? 'sequential',
+        track: apiTrack ? { // Only create a track object if the API provides one
+            id: apiTrack.id ?? randomUUID(),
+            title: apiTrack.title ?? 'Unknown Title',
+            artist: apiTrack.artist ?? 'Unknown Artist',
+            // Use a placeholder only if the album art is missing from the real data
+            albumArtUrl: apiTrack.albumArtUrl || 'https://placehold.co/300x300.png',
+            duration: apiTrack.duration ?? 0,
+        } : null, // If there's no track from the API, we return null
       };
     } catch (error) {
-      console.error(`Failed to get playback state for ${ip}`, error);
-      // Return a sensible default state on error
+      console.error(`Failed to get playback state for ${ip}:`, error);
+      // Return a sensible default "offline" or "error" state
       return {
         state: "stopped",
         progress: 0,
@@ -176,5 +192,3 @@ export async function setPlayMode(deviceId: string, ip: string, mode: string): P
     // The real B&O API might have a different path and payload for this
     await beoApi.put(ip, 'BeoZone/Zone/Player/playMode', { mode });
 }
-
-    
