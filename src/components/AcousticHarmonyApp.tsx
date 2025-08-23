@@ -16,21 +16,6 @@ import { AppHeader } from "./AppHeader";
 import { AppNavigation } from "./AppNavigation";
 import { discoverDevices, getAvailableSources } from "@/lib/actions";
 
-const MOCK_DEVICES: Device[] = [
-    { id: '1', name: 'Living Room Speaker', ip: '192.168.1.100', online: true },
-    { id: '2', name: 'Bedroom Speaker', ip: '192.168.1.101', online: false },
-    { id: '3', name: 'Kitchen Speaker', ip: '192.168.1.102', online: true },
-];
-
-const MOCK_TRACKS: Track[] = [
-    { id: 't1', title: 'Bohemian Rhapsody', artist: 'Queen', albumArtUrl: 'https://placehold.co/300x300.png', duration: 355 },
-    { id: 't2', title: 'Stairway to Heaven', artist: 'Led Zeppelin', albumArtUrl: 'https://placehold.co/300x300.png', duration: 482 },
-    { id: 't3', title: 'Hotel California', artist: 'Eagles', albumArtUrl: 'https://placehold.co/300x300.png', duration: 391 },
-    { id: 't4', title: 'Smells Like Teen Spirit', artist: 'Nirvana', albumArtUrl: 'https://placehold.co/300x300.png', duration: 301 },
-    { id: 't5', title: 'Billie Jean', artist: 'Michael Jackson', albumArtUrl: 'https://placehold.co/300x300.png', duration: 294 },
-];
-
-
 export interface AppState {
     devices: Device[];
     selectedDeviceId: string | null;
@@ -79,16 +64,16 @@ export const useAppContext = () => {
 };
 
 export default function AcousticHarmonyApp({ children }: { children: React.ReactNode }) {
-  const [devices, setDevices] = React.useState<Device[]>(MOCK_DEVICES);
-  const [selectedDeviceId, setSelectedDeviceId] = React.useState<string | null>(MOCK_DEVICES[0]?.id ?? null);
+  const [devices, setDevices] = React.useState<Device[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = React.useState<string | null>(null);
   const [schedules, setSchedules] = React.useState<Schedule[]>([]);
   const [track, setTrack] = React.useState<Track | null>(null);
   const [playlists, setPlaylists] = React.useState<PlaylistType[]>([]);
   const [nowPlaying, setNowPlaying] = React.useState<Track[]>([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = React.useState<string | null>(null);
-  const [availableTracks, setAvailableTracks] = React.useState<Track[]>(MOCK_TRACKS);
+  const [availableTracks, setAvailableTracks] = React.useState<Track[]>([]);
   const [availableSources, setAvailableSources] = React.useState<Source[]>([]);
-  const [musicFolders, setMusicFolders] = React.useState<MusicFolder[]>([ { id: '1', path: '/Users/me/Music' } ]);
+  const [musicFolders, setMusicFolders] = React.useState<MusicFolder[]>([]);
   const [playbackState, setPlaybackState] = React.useState<PlaybackState>({
     isPlaying: false,
     progress: 0,
@@ -160,77 +145,6 @@ React.useEffect(() => {
     fetchSources();
 // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [selectedDeviceId, selectedDevice?.online]);
-
-  React.useEffect(() => {
-    if (!selectedDevice || !selectedDevice.online) {
-      return;
-    }
-
-    const abortController = new AbortController();
-    const signal = abortController.signal;
-    let isMounted = true;
-
-    const fetchNotifications = async () => {
-        while (isMounted) {
-            try {
-                const url = `https://jsonplaceholder.typicode.com/posts/${(Math.floor(Math.random() * 100) + 1)}?_=${Date.now()}`;
-                
-                const response = await fetch(url, { signal });
-                
-                if (!response.ok) {
-                    await new Promise(resolve => setTimeout(resolve, 5000));
-                    continue;
-                }
-
-                await response.json();
-                
-                if (signal.aborted) break;
-
-                const randomNotificationType = Math.random();
-                if (randomNotificationType < 0.33) {
-                    const newVolume = Math.floor(Math.random() * 101);
-                    console.log('Received volume notification:', newVolume);
-                    setPlaybackState(prev => ({ ...prev, volume: newVolume }));
-                } else if (randomNotificationType < 0.66) {
-                    // Simulate progress change only for local source
-                    if (playbackState.source === 'local') {
-                        const newProgress = Math.floor(Math.random() * (track?.duration ?? 300));
-                        const newIsPlaying = Math.random() > 0.5;
-                        console.log('Received progress notification:', { progress: newProgress, isPlaying: newIsPlaying });
-                        setPlaybackState(prev => ({ ...prev, progress: newProgress, isPlaying: newIsPlaying }));
-                    }
-                } else {
-                    if (playbackState.source === 'local' && nowPlaying.length > 0) {
-                        const newTrack = nowPlaying[Math.floor(Math.random() * nowPlaying.length)];
-                        console.log('Received nowPlaying notification:', newTrack.title);
-                        setTrack(newTrack);
-                    }
-                }
-
-
-            } catch (error: any) {
-                if (error.name === 'AbortError' || (error instanceof Error && error.message.includes('aborted'))) {
-                    console.log('Notification fetch aborted.');
-                    break;
-                }
-                if (signal.aborted) {
-                    console.log('Notification fetch aborted.');
-                    break;
-                }
-                console.error("Notification stream error:", error);
-                await new Promise(resolve => setTimeout(resolve, 5000));
-            }
-        }
-    };
-
-    fetchNotifications();
-
-    return () => {
-        isMounted = false;
-        abortController.abort("Component unmounted or dependency changed");
-    };
-}, [selectedDeviceId, selectedDevice, track?.duration, nowPlaying, playbackState.source]);
-
 
   const handleSelectDevice = (deviceId: string) => {
     setSelectedDeviceId(deviceId);

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,15 +46,15 @@ export function Settings() {
         setIsScanning(true);
         toast({
             title: "Scanning all music folders",
-            description: "This may take a few moments...",
+            description: "This will be implemented with a real backend.",
         });
-        // This is where you would call your backend to scan the folders.
-        // For now, we'll just simulate it.
+        // In a real application, this would call a backend service
+        // to scan the folders and update the available tracks.
         setTimeout(() => {
             setIsScanning(false);
             toast({
                 title: "Scan Complete",
-                description: "Found 150 new tracks.",
+                description: "This is a mock completion message.",
             });
         }, 3000);
     };
@@ -78,6 +79,9 @@ export function Settings() {
                         </div>
                         <div className="space-y-2">
                             <Label>Local Music Folders</Label>
+                            <p className="text-sm text-muted-foreground">
+                                Add the absolute paths to your local music folders. This requires a backend service to access the file system.
+                            </p>
                             <div className="space-y-2">
                                 {localFolders.map((folder) => (
                                     <div key={folder.id} className="flex gap-2">
