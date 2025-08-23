@@ -72,7 +72,7 @@ export function PlaybackControls() {
           {isDeviceOnline ? (track ? `Playing on ${device.ip}` : "Ready to play") : "Device is offline"}
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col items-center space-y-6">
+      <CardContent className="flex flex-col items-center space-y-4">
         <div className="relative w-full max-w-xs aspect-square group">
             {track?.albumArtUrl ? (
                 <Image
@@ -101,26 +101,24 @@ export function PlaybackControls() {
           <p className="text-sm text-muted-foreground mt-1">{track?.artist ?? "—"}</p>
         </div>
 
-        <div className="w-full max-w-sm space-y-4">
-            <div className="space-y-2">
-                <div className="px-1">
-                <Slider
-                    value={[currentProgress]}
-                    max={trackDuration}
-                    step={1}
-                    onValueChange={onProgressChange}
-                    disabled={!isDeviceOnline || !track || !isLocalSource}
-                    aria-label="Track progress"
-                />
-                </div>
-                <div className="flex justify-between text-xs text-muted-foreground px-1">
-                    <span>{isLocalSource ? formatTime(currentProgress) : '--:--'}</span>
-                    <span>{isLocalSource ? formatTime(trackDuration) : '--:--'}</span>
-                </div>
+        <div className="w-full max-w-sm space-y-2">
+            <div className="px-1">
+            <Slider
+                value={[currentProgress]}
+                max={trackDuration}
+                step={1}
+                onValueChange={onProgressChange}
+                disabled={!isDeviceOnline || !track || !isLocalSource}
+                aria-label="Track progress"
+            />
+            </div>
+            <div className="flex justify-between text-xs text-muted-foreground px-1">
+                <span>{isLocalSource ? formatTime(currentProgress) : '--:--'}</span>
+                <span>{isLocalSource ? formatTime(trackDuration) : '--:--'}</span>
             </div>
         </div>
 
-        <div className="flex items-center justify-center space-x-2 w-full">
+        <div className="flex items-center justify-center space-x-2 w-full py-2">
           <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !track || !isLocalSource} className="w-12 h-12">
             <Rewind className="h-6 w-6" />
           </Button>
@@ -138,7 +136,7 @@ export function PlaybackControls() {
           </Button>
         </div>
 
-        <div className="flex items-center space-x-3 w-full max-w-sm pt-4">
+        <div className="flex items-center space-x-3 w-full max-w-sm pt-2">
           <Button variant="ghost" size="icon" onClick={handleMuteToggle} disabled={!isDeviceOnline} className="text-muted-foreground hover:text-foreground">
             {playbackState.volume === 0 ? <VolumeX className="h-5 w-5"/> : <Volume2 className="h-5 w-5" />}
           </Button>
@@ -177,7 +175,7 @@ export function PlaybackControls() {
             </Select>
         </div>
         
-        <Separator className="my-6 w-full max-w-sm"/>
+        <Separator className="my-4 w-full max-w-sm"/>
 
         <div className="space-y-4 w-full max-w-sm">
             <h3 className="font-medium text-foreground text-center">DLNA Services</h3>
@@ -189,5 +187,3 @@ export function PlaybackControls() {
     </Card>
   );
 }
-
-    
