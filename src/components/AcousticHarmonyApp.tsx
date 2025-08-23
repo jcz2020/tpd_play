@@ -14,6 +14,7 @@ import { Speaker } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AppHeader } from "./AppHeader";
 import { AppNavigation } from "./AppNavigation";
+import { discoverDevices } from "@/lib/actions";
 
 const MOCK_DEVICES: Device[] = [
     { id: '1', name: 'Living Room Speaker', ip: '192.168.1.100', online: true },
@@ -56,6 +57,8 @@ export type AppActions = {
     handleSavePlaylist: (playlist: PlaylistType) => void;
     handleDeletePlaylist: (playlistId: string) => void;
     handleMusicFoldersChange: (folders: MusicFolder[]) => void;
+    handleAddDevice: (device: Omit<Device, 'id' | 'online'>) => void;
+    handleDiscoverDevices: () => Promise<Device[]>;
 };
 
 
@@ -239,6 +242,24 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     });
   }
 
+  const handleAddDevice = (device: Omit<Device, 'id' | 'online'>) => {
+    const newDevice: Device = {
+        ...device,
+        id: Date.now().toString(),
+        online: true, // Assume online when added
+    };
+    setDevices(prev => [...prev, newDevice]);
+    setSelectedDeviceId(newDevice.id);
+    toast({
+        title: "Device Added",
+        description: `${device.name} has been added to your devices.`,
+    });
+  };
+
+  const handleDiscoverDevices = async () => {
+    return await discoverDevices();
+  }
+
   const state: AppState = {
     devices,
     selectedDeviceId,
@@ -260,7 +281,9 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     handleToggleSchedule,
     handleSavePlaylist,
     handleDeletePlaylist,
-    handleMusicFoldersChange
+    handleMusicFoldersChange,
+    handleAddDevice,
+    handleDiscoverDevices
   };
 
   return (
