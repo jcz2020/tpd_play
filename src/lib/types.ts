@@ -47,10 +47,15 @@ export interface Source {
 
 export type PlayMode = 'sequential' | 'repeat-list' | 'repeat-one' | 'shuffle';
 
+export type PlayState = 'playing' | 'paused' | 'stopped' | 'buffering';
+
 export interface PlaybackState {
-    isPlaying: boolean;
+    state: PlayState;
     progress: number;
     volume: number;
     source: string;
     playMode: PlayMode;
+    track: Track | null;
 }
+
+    

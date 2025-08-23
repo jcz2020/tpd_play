@@ -14,7 +14,21 @@ import { Speaker } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AppHeader } from "./AppHeader";
 import { AppNavigation } from "./AppNavigation";
-import { discoverDevices, getAvailableSources, getDevices, addDevice, deleteDevice } from "@/lib/actions";
+import { 
+    discoverDevices, 
+    getAvailableSources, 
+    getDevices, 
+    addDevice, 
+    deleteDevice,
+    getPlaybackState,
+    setPlaybackState as setDevicePlaybackState,
+    seekTo,
+    setVolume as setDeviceVolume,
+    nextTrack,
+    previousTrack,
+    setPlayMode as setDevicePlayMode,
+    changeSource,
+} from "@/lib/actions";
 
 export interface AppState {
     devices: Device[];
@@ -35,7 +49,7 @@ export type AppActions = {
     handleTogglePlay: () => void;
     handleNextTrack: () => void;
     handlePrevTrack: () => void;
-    handleProgressChange: (value: number[]) => void;
+    handleSeek: (value: number[]) => void;
     handleVolumeChange: (value: number[]) => void;
     handleSaveSchedule: (schedule: Omit<Schedule, 'id'>) => void;
     handleDeleteSchedule: (scheduleId: string) => void;
@@ -75,19 +89,20 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
   const [availableSources, setAvailableSources] = React.useState<Source[]>([]);
   const [musicFolders, setMusicFolders] = React.useState<MusicFolder[]>([]);
   const [playbackState, setPlaybackState] = React.useState<PlaybackState>({
-    isPlaying: false,
+    state: "stopped",
     progress: 0,
-    volume: 75,
+    volume: 50,
     source: 'local',
     playMode: 'sequential',
+    track: null,
   });
   const [isLoaded, setIsLoaded] = React.useState(false);
-
 
   const { toast } = useToast();
 
   const selectedDevice = React.useMemo(() => devices.find(d => d.id === selectedDeviceId), [devices, selectedDeviceId]);
 
+  // Initial data loading
   React.useEffect(() => {
     const loadInitialData = async () => {
         const initialDevices = await getDevices();
@@ -121,29 +136,29 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
         console.error("Failed to load state from localStorage", error);
     }
     setIsLoaded(true);
-// eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-// Save state to localStorage whenever it changes
-React.useEffect(() => {
-    if (!isLoaded) return;
-    try {
-        const stateToSave = {
-            playbackState: {
-                volume: playbackState.volume,
-                source: playbackState.source,
-                playMode: playbackState.playMode,
-            },
-            selectedPlaylistId,
-            selectedDeviceId,
-        };
-        localStorage.setItem('acousticHarmonyState', JSON.stringify(stateToSave));
-    } catch (error) {
-        console.error("Failed to save state to localStorage", error);
-    }
-}, [playbackState.volume, playbackState.source, playbackState.playMode, selectedPlaylistId, selectedDeviceId, isLoaded]);
+  // Save state to localStorage whenever it changes
+  React.useEffect(() => {
+      if (!isLoaded) return;
+      try {
+          const stateToSave = {
+              playbackState: {
+                  volume: playbackState.volume,
+                  source: playbackState.source,
+                  playMode: playbackState.playMode,
+              },
+              selectedPlaylistId,
+              selectedDeviceId,
+          };
+          localStorage.setItem('acousticHarmonyState', JSON.stringify(stateToSave));
+      } catch (error) {
+          console.error("Failed to save state to localStorage", error);
+      }
+  }, [playbackState.volume, playbackState.source, playbackState.playMode, selectedPlaylistId, selectedDeviceId, isLoaded]);
 
-
+  // Fetch available sources when device changes
   React.useEffect(() => {
     if (!selectedDevice || !selectedDevice.online) {
       setAvailableSources([]);
@@ -169,104 +184,116 @@ React.useEffect(() => {
       }
     };
     fetchSources();
-// eslint-disable-next-line react-hooks/exhaustive-deps
-}, [selectedDevice]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDevice]);
+
+  // Poll for playback state
+  React.useEffect(() => {
+    const pollPlaybackState = async () => {
+        if (selectedDevice?.online) {
+            try {
+                const state = await getPlaybackState(selectedDevice.id, selectedDevice.ip);
+                setPlaybackState(state);
+                setTrack(state.track);
+            } catch (error) {
+                console.error("Failed to poll playback state", error);
+            }
+        }
+    };
+
+    const intervalId = setInterval(pollPlaybackState, 2000); // Poll every 2 seconds
+
+    return () => clearInterval(intervalId);
+  }, [selectedDevice]);
+
 
   const handleSelectDevice = (deviceId: string) => {
     setSelectedDeviceId(deviceId);
+    setPlaybackState({
+        state: "stopped",
+        progress: 0,
+        volume: 50,
+        source: 'local',
+        playMode: 'sequential',
+        track: null,
+    });
+    setTrack(null);
   };
 
-  const handleTogglePlay = () => {
-    if (!selectedDevice?.online) {
+  const handleTogglePlay = async () => {
+    if (!selectedDevice?.online) return;
+    const newState = playbackState.state === 'playing' ? 'paused' : 'playing';
+    try {
+        await setDevicePlaybackState(selectedDevice.id, selectedDevice.ip, newState);
+        setPlaybackState(prev => ({...prev, state: newState}));
+    } catch (error) {
+        toast({ variant: "destructive", title: "Failed to toggle play state" });
+    }
+  };
+
+  const handleNextTrack = async () => {
+    if (!selectedDevice?.online) return;
+    try {
+        await nextTrack(selectedDevice.id, selectedDevice.ip);
+    } catch (error) {
+        toast({ variant: "destructive", title: "Failed to skip to next track" });
+    }
+  }
+
+  const handlePrevTrack = async () => {
+    if (!selectedDevice?.online) return;
+    try {
+        await previousTrack(selectedDevice.id, selectedDevice.ip);
+    } catch (error) {
+        toast({ variant: "destructive", title: "Failed to go to previous track" });
+    }
+  }
+
+  const handleSeek = async (value: number[]) => {
+    if (!selectedDevice?.online || !track) return;
+    const newProgress = value[0];
+    setPlaybackState(prev => ({ ...prev, progress: newProgress }));
+    try {
+        await seekTo(selectedDevice.id, selectedDevice.ip, newProgress);
+    } catch (error) {
+        toast({ variant: "destructive", title: "Seek failed" });
+    }
+  }
+
+  const handleVolumeChange = async (value: number[]) => {
+    if (!selectedDevice?.online) return;
+    const newVolume = value[0];
+    setPlaybackState(prev => ({ ...prev, volume: newVolume }));
+    try {
+        await setDeviceVolume(selectedDevice.id, selectedDevice.ip, newVolume);
+    } catch (error) {
+        // Don't toast on volume change to avoid being spammy
+        console.error("Failed to set volume", error);
+    }
+  }
+
+  const handleSourceChange = async (source: string) => {
+    if (!selectedDevice) return;
+    try {
+        await changeSource(selectedDevice.id, selectedDevice.ip, source);
+        setPlaybackState(prev => ({ ...prev, source }));
+    } catch (error) {
+        toast({ variant: "destructive", title: "Failed to change source" });
+    }
+  }
+
+  const handlePlayModeChange = async (mode: PlayMode) => {
+    if (!selectedDevice) return;
+    try {
+        await setDevicePlayMode(selectedDevice.id, selectedDevice.ip, mode);
+        setPlaybackState(prev => ({ ...prev, playMode: mode }));
         toast({
-            variant: "destructive",
-            title: "Device Offline",
-            description: `${selectedDevice?.name} is currently offline.`,
-        });
-        return;
+            title: "Playback Mode Changed",
+            description: `Mode set to ${mode.replace('-', ' ')}.`,
+        })
+    } catch (error) {
+        toast({ variant: "destructive", title: "Failed to set play mode" });
     }
-    if (!track && nowPlaying.length > 0) {
-        setTrack(nowPlaying[0]);
-    }
-    setPlaybackState(prev => ({ ...prev, isPlaying: !prev.isPlaying }));
-  };
-
-  const handleNextTrack = () => {
-    if (!track || nowPlaying.length === 0) return;
-    const currentIndex = nowPlaying.findIndex(t => t.id === track.id);
-    let nextIndex;
-
-    switch (playbackState.playMode) {
-        case 'shuffle':
-            nextIndex = Math.floor(Math.random() * nowPlaying.length);
-            break;
-        case 'repeat-one':
-            nextIndex = currentIndex;
-            break;
-        case 'repeat-list':
-            nextIndex = (currentIndex + 1) % nowPlaying.length;
-            break;
-        case 'sequential':
-        default:
-            nextIndex = currentIndex + 1;
-            if (nextIndex >= nowPlaying.length) {
-                setPlaybackState(prev => ({...prev, isPlaying: false}));
-                return; // Stop at the end of the list
-            }
-            break;
-    }
-    setTrack(nowPlaying[nextIndex]);
-    setPlaybackState(p => ({...p, progress: 0}));
-  }
-
-  const handlePrevTrack = () => {
-      if (!track || nowPlaying.length === 0) return;
-      const currentIndex = nowPlaying.findIndex(t => t.id === track.id);
-      let prevIndex = (currentIndex - 1 + nowPlaying.length) % nowPlaying.length;
-      if (playbackState.playMode === 'shuffle') {
-        prevIndex = Math.floor(Math.random() * nowPlaying.length);
-      }
-      setTrack(nowPlaying[prevIndex]);
-      setPlaybackState(p => ({...p, progress: 0}));
-  }
-
-  const handleProgressChange = (value: number[]) => {
-    setPlaybackState(prev => ({ ...prev, progress: value[0] }));
-  }
-
-  const handleVolumeChange = (value: number[]) => {
-    setPlaybackState(prev => ({ ...prev, volume: value[0] }));
-  }
-
-  const handleSourceChange = (source: string) => {
-    setPlaybackState(prev => ({ ...prev, source, isPlaying: false, progress: 0 }));
-    const sourceName = availableSources.find(s => s.id === source)?.name || source;
-    
-    if (source !== 'local') {
-        setTrack({
-            id: `ext-${source}`,
-            title: `Playing from ${sourceName}`,
-            artist: 'External Source',
-            albumArtUrl: 'https://placehold.co/300x300.png',
-            duration: 0,
-        });
-        setNowPlaying([]);
-    } else {
-        if(selectedPlaylistId) {
-            handleSelectPlaylist(selectedPlaylistId);
-        } else {
-            setTrack(null);
-            setNowPlaying([]);
-        }
-    }
-  }
-
-  const handlePlayModeChange = (mode: PlayMode) => {
-    setPlaybackState(prev => ({ ...prev, playMode: mode }));
-    toast({
-        title: "Playback Mode Changed",
-        description: `Mode set to ${mode.replace('-', ' ')}.`,
-    })
   }
 
   const handleSelectPlaylist = (playlistId: string, silent = false) => {
@@ -279,10 +306,9 @@ React.useEffect(() => {
         setNowPlaying(tracksInPlaylist);
         if (tracksInPlaylist.length > 0) {
             setTrack(tracksInPlaylist[0]);
-            setPlaybackState(p => ({...p, isPlaying: !silent, progress: 0}));
+            // In a real app, you would now tell the device to play this playlist
         } else {
             setTrack(null);
-            setPlaybackState(p => ({...p, isPlaying: false, progress: 0}));
         }
         if (!silent) {
             toast({ title: `Playlist "${playlist.name}" selected` });
@@ -291,10 +317,12 @@ React.useEffect(() => {
   }
 
   const handleSelectTrack = (trackId: string) => {
+    if (!selectedDevice) return;
     const selectedTrack = nowPlaying.find(t => t.id === trackId);
     if (selectedTrack) {
+        // Here you would tell the device to play this specific track from the current queue
         setTrack(selectedTrack);
-        setPlaybackState(p => ({...p, isPlaying: true, progress: 0}));
+        setPlaybackState(p => ({...p, state: 'playing', progress: 0}));
     }
   }
 
@@ -328,7 +356,6 @@ React.useEffect(() => {
     }
     setPlaylists(newPlaylists);
 
-    // If the currently selected playlist was just updated, refresh the nowPlaying list
     if (selectedPlaylistId === playlist.id) {
         const tracksInPlaylist = playlist.trackIds.map(trackId => 
             availableTracks.find(t => t.id === trackId)
@@ -424,7 +451,7 @@ React.useEffect(() => {
     handleTogglePlay,
     handleNextTrack,
     handlePrevTrack,
-    handleProgressChange,
+    handleSeek,
     handleVolumeChange,
     handleSaveSchedule,
     handleDeleteSchedule,

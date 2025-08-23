@@ -11,7 +11,7 @@ import { Pause, Play, Rewind, FastForward, Volume2, VolumeX, Music, Disc, Blueto
 import { cn } from "@/lib/utils";
 import { useAppContext } from "./AcousticHarmonyApp";
 import { Label } from "./ui/label";
-import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
 function formatTime(seconds: number) {
   if (isNaN(seconds) || seconds < 0) return "0:00";
@@ -33,7 +33,7 @@ const sourceIcons: { [key: string]: React.ElementType } = {
 export function PlaybackControls() {
   const { state, actions } = useAppContext();
   const { track, playbackState, availableSources } = state;
-  const { handleTogglePlay, handleProgressChange, handleVolumeChange, handleSourceChange, handlePlayModeChange, handleNextTrack, handlePrevTrack } = actions;
+  const { handleTogglePlay, handleSeek, handleVolumeChange, handleSourceChange, handlePlayModeChange, handleNextTrack, handlePrevTrack } = actions;
   
   const device = state.devices.find(d => d.id === state.selectedDeviceId);
 
@@ -58,8 +58,8 @@ export function PlaybackControls() {
 
   const isDeviceOnline = !!device?.online;
   const isLocalSource = playbackState.source === 'local';
-  const trackDuration = isLocalSource ? (track?.duration ?? 0) : 0;
-  const currentProgress = isLocalSource ? Math.min(playbackState.progress, trackDuration) : 0;
+  const trackDuration = track?.duration ?? 0;
+  const currentProgress = Math.min(playbackState.progress, trackDuration);
   
   const sourceInfo = availableSources.find(s => s.id === playbackState.source)
   const CurrentSourceIcon = sourceIcons[sourceInfo?.type ?? 'local'] || Music;
@@ -77,8 +77,11 @@ export function PlaybackControls() {
     const nextIndex = (currentIndex + 1) % modes.length;
     handlePlayModeChange(modes[nextIndex] as any);
   }
+  
+  const isPlaying = playbackState.state === 'playing';
 
   return (
+    <TooltipProvider>
     <Card className={cn("border-none shadow-none bg-transparent w-full")}>
       <CardHeader className="text-center">
         <h2 className="text-xl font-semibold">{device?.name ?? "No Device Selected"}</h2>
@@ -121,14 +124,14 @@ export function PlaybackControls() {
                 value={[currentProgress]}
                 max={trackDuration}
                 step={1}
-                onValueChange={handleProgressChange}
+                onValueChange={handleSeek}
                 disabled={!isDeviceOnline || !track || !isLocalSource}
                 aria-label="Track progress"
             />
             </div>
             <div className="flex justify-between text-xs text-muted-foreground px-1">
-                <span>{isLocalSource ? formatTime(currentProgress) : '--:--'}</span>
-                <span>{isLocalSource ? formatTime(trackDuration) : '--:--'}</span>
+                <span>{formatTime(currentProgress)}</span>
+                <span>{formatTime(trackDuration)}</span>
             </div>
         </div>
 
@@ -150,9 +153,9 @@ export function PlaybackControls() {
             className="rounded-full w-20 h-20 shadow-lg bg-primary hover:bg-primary/90 transition-all scale-100 hover:scale-105 active:scale-100" 
             onClick={handleTogglePlay} 
             disabled={!isDeviceOnline || !track}
-            aria-label={playbackState.isPlaying ? "Pause" : "Play"}
+            aria-label={isPlaying ? "Pause" : "Play"}
             >
-            {playbackState.isPlaying ? <Pause className="h-8 w-8 fill-primary-foreground" /> : <Play className="h-8 w-8 fill-primary-foreground" />}
+            {isPlaying ? <Pause className="h-8 w-8 fill-primary-foreground" /> : <Play className="h-8 w-8 fill-primary-foreground" />}
           </Button>
           <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !track || !isLocalSource} className="w-12 h-12" onClick={handleNextTrack}>
             <FastForward className="h-6 w-6" />
@@ -208,5 +211,8 @@ export function PlaybackControls() {
         </div>
       </CardContent>
     </Card>
+    </TooltipProvider>
   );
 }
+
+    
