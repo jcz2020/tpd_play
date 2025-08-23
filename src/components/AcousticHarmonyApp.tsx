@@ -86,13 +86,21 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
 
   const { toast } = useToast();
 
-  const selectedDevice = devices.find(d => d.id === selectedDeviceId);
+  const selectedDevice = React.useMemo(() => devices.find(d => d.id === selectedDeviceId), [devices, selectedDeviceId]);
 
   React.useEffect(() => {
     const loadInitialData = async () => {
         const initialDevices = await getDevices();
         setDevices(initialDevices);
         if (initialDevices.length > 0) {
+            const savedState = localStorage.getItem('acousticHarmonyState');
+            if (savedState) {
+                const { selectedDeviceId: savedDeviceId } = JSON.parse(savedState);
+                if (savedDeviceId && initialDevices.find(d => d.id === savedDeviceId)) {
+                    setSelectedDeviceId(savedDeviceId);
+                    return;
+                }
+            }
             setSelectedDeviceId(initialDevices[0].id);
         }
     }
@@ -104,9 +112,10 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     try {
         const savedState = localStorage.getItem('acousticHarmonyState');
         if (savedState) {
-            const { playbackState: savedPlayback, selectedPlaylistId: savedPlaylistId } = JSON.parse(savedState);
+            const { playbackState: savedPlayback, selectedPlaylistId: savedPlaylistId, selectedDeviceId: savedDeviceId } = JSON.parse(savedState);
             if (savedPlayback) setPlaybackState(prev => ({ ...prev, ...savedPlayback }));
             if (savedPlaylistId) handleSelectPlaylist(savedPlaylistId, true);
+            if (savedDeviceId) setSelectedDeviceId(savedDeviceId);
         }
     } catch (error) {
         console.error("Failed to load state from localStorage", error);
@@ -124,15 +133,15 @@ React.useEffect(() => {
                 volume: playbackState.volume,
                 source: playbackState.source,
                 playMode: playbackState.playMode,
-                progress: playbackState.progress,
             },
-            selectedPlaylistId: selectedPlaylistId,
+            selectedPlaylistId,
+            selectedDeviceId,
         };
         localStorage.setItem('acousticHarmonyState', JSON.stringify(stateToSave));
     } catch (error) {
         console.error("Failed to save state to localStorage", error);
     }
-}, [playbackState.volume, playbackState.source, playbackState.playMode, selectedPlaylistId, isLoaded, playbackState.progress]);
+}, [playbackState.volume, playbackState.source, playbackState.playMode, selectedPlaylistId, selectedDeviceId, isLoaded]);
 
 
   React.useEffect(() => {
@@ -145,9 +154,15 @@ React.useEffect(() => {
       try {
         const sources = await getAvailableSources(selectedDevice.id, selectedDevice.ip);
         setAvailableSources(sources);
-        if (!sources.find(s => s.id === playbackState.source)) {
-            handleSourceChange(sources[0]?.id ?? 'local');
+        
+        const isCurrentSourceValid = sources.some(s => s.id === playbackState.source);
+        
+        if (!isCurrentSourceValid && sources.length > 0) {
+            handleSourceChange(sources[0].id);
+        } else if (!isCurrentSourceValid) {
+            handleSourceChange('local');
         }
+
       } catch (error) {
         toast({ variant: "destructive", title: "Failed to get sources" });
         setAvailableSources([]);
@@ -155,16 +170,10 @@ React.useEffect(() => {
     };
     fetchSources();
 // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [selectedDeviceId, selectedDevice?.online]);
+}, [selectedDevice]);
 
   const handleSelectDevice = (deviceId: string) => {
     setSelectedDeviceId(deviceId);
-    const device = devices.find(d => d.id === deviceId);
-    if (device && device.online) {
-        setPlaybackState(prev => ({ ...prev, isPlaying: false, progress: 0 }));
-    } else {
-        setTrack(null);
-    }
   };
 
   const handleTogglePlay = () => {
@@ -232,11 +241,7 @@ React.useEffect(() => {
   const handleSourceChange = (source: string) => {
     setPlaybackState(prev => ({ ...prev, source, isPlaying: false, progress: 0 }));
     const sourceName = availableSources.find(s => s.id === source)?.name || source;
-    toast({
-        title: "Source Changed",
-        description: `Switched to ${sourceName}.`,
-    });
-
+    
     if (source !== 'local') {
         setTrack({
             id: `ext-${source}`,
@@ -465,3 +470,5 @@ React.useEffect(() => {
     </AppContext.Provider>
   );
 }
+
+    
