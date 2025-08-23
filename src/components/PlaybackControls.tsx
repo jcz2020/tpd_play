@@ -3,15 +3,15 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Pause, Play, Rewind, FastForward, Volume2, VolumeX, Music, Disc, Bluetooth, AudioLines, Library, Radio, WifiOff } from "lucide-react";
+import { Pause, Play, Rewind, FastForward, Volume2, VolumeX, Music, Disc, Bluetooth, AudioLines, Library, Radio, WifiOff, Shuffle, Repeat, Repeat1 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "./AcousticHarmonyApp";
-import { Separator } from "./ui/separator";
 import { Label } from "./ui/label";
+import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 
 function formatTime(seconds: number) {
   if (isNaN(seconds) || seconds < 0) return "0:00";
@@ -33,7 +33,7 @@ const sourceIcons: { [key: string]: React.ElementType } = {
 export function PlaybackControls() {
   const { state, actions } = useAppContext();
   const { track, playbackState, availableSources } = state;
-  const { handleTogglePlay: onTogglePlay, handleProgressChange: onProgressChange, handleVolumeChange: onVolumeChange, handleSourceChange } = actions;
+  const { handleTogglePlay, handleProgressChange, handleVolumeChange, handleSourceChange, handlePlayModeChange, handleNextTrack, handlePrevTrack } = actions;
   
   const device = state.devices.find(d => d.id === state.selectedDeviceId);
 
@@ -42,11 +42,11 @@ export function PlaybackControls() {
 
   const handleMuteToggle = () => {
     if (isMuted) {
-        onVolumeChange([lastVolumeRef.current]);
+        handleVolumeChange([lastVolumeRef.current]);
         setIsMuted(false);
     } else {
         lastVolumeRef.current = playbackState.volume;
-        onVolumeChange([0]);
+        handleVolumeChange([0]);
         setIsMuted(true);
     }
   }
@@ -64,13 +64,27 @@ export function PlaybackControls() {
   const sourceInfo = availableSources.find(s => s.id === playbackState.source)
   const CurrentSourceIcon = sourceIcons[sourceInfo?.type ?? 'local'] || Music;
 
+  const PlayModeIcon = {
+    'sequential': Repeat,
+    'repeat-list': Repeat,
+    'repeat-one': Repeat1,
+    'shuffle': Shuffle,
+  }[playbackState.playMode];
+
+  const nextPlayMode = () => {
+    const modes = ['sequential', 'repeat-list', 'repeat-one', 'shuffle'];
+    const currentIndex = modes.indexOf(playbackState.playMode);
+    const nextIndex = (currentIndex + 1) % modes.length;
+    handlePlayModeChange(modes[nextIndex] as any);
+  }
+
   return (
     <Card className={cn("border-none shadow-none bg-transparent w-full")}>
       <CardHeader className="text-center">
-        <CardTitle>{device?.name ?? "No Device Selected"}</CardTitle>
-        <CardDescription>
+        <h2 className="text-xl font-semibold">{device?.name ?? "No Device Selected"}</h2>
+        <p className="text-sm text-muted-foreground">
           {isDeviceOnline ? (track ? `Playing on ${device.ip}` : "Ready to play") : "Device is offline"}
-        </CardDescription>
+        </p>
       </CardHeader>
       <CardContent className="flex flex-col items-center space-y-4">
         <div className="relative w-full max-w-xs aspect-square group">
@@ -96,7 +110,7 @@ export function PlaybackControls() {
             )}
         </div>
 
-        <div className="text-center w-full min-h-[4rem]">
+        <div className="text-center w-full min-h-[4rem] pt-4">
           <h3 className="text-2xl font-semibold tracking-tight">{track?.title ?? "Nothing playing"}</h3>
           <p className="text-sm text-muted-foreground mt-1">{track?.artist ?? "—"}</p>
         </div>
@@ -107,7 +121,7 @@ export function PlaybackControls() {
                 value={[currentProgress]}
                 max={trackDuration}
                 step={1}
-                onValueChange={onProgressChange}
+                onValueChange={handleProgressChange}
                 disabled={!isDeviceOnline || !track || !isLocalSource}
                 aria-label="Track progress"
             />
@@ -119,21 +133,39 @@ export function PlaybackControls() {
         </div>
 
         <div className="flex items-center justify-center space-x-2 w-full py-2">
-          <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !track || !isLocalSource} className="w-12 h-12">
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !track || !isLocalSource} className="w-12 h-12 text-muted-foreground hover:text-foreground">
+                        <Shuffle className={cn(playbackState.playMode === 'shuffle' && 'text-primary')} />
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent><p>Shuffle</p></TooltipContent>
+            </Tooltip>
+
+          <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !track || !isLocalSource} className="w-12 h-12" onClick={handlePrevTrack}>
             <Rewind className="h-6 w-6" />
           </Button>
           <Button 
             size="lg" 
             className="rounded-full w-20 h-20 shadow-lg bg-primary hover:bg-primary/90 transition-all scale-100 hover:scale-105 active:scale-100" 
-            onClick={onTogglePlay} 
+            onClick={handleTogglePlay} 
             disabled={!isDeviceOnline || !track}
             aria-label={playbackState.isPlaying ? "Pause" : "Play"}
             >
             {playbackState.isPlaying ? <Pause className="h-8 w-8 fill-primary-foreground" /> : <Play className="h-8 w-8 fill-primary-foreground" />}
           </Button>
-          <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !track || !isLocalSource} className="w-12 h-12">
+          <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !track || !isLocalSource} className="w-12 h-12" onClick={handleNextTrack}>
             <FastForward className="h-6 w-6" />
           </Button>
+          
+          <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !track || !isLocalSource} className="w-12 h-12 text-muted-foreground hover:text-foreground" onClick={nextPlayMode}>
+                         <PlayModeIcon className={cn((playbackState.playMode === 'repeat-list' || playbackState.playMode === 'repeat-one') && 'text-primary')} />
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent><p>{playbackState.playMode.replace('-', ' ')}</p></TooltipContent>
+            </Tooltip>
         </div>
 
         <div className="flex items-center space-x-3 w-full max-w-sm pt-2">
@@ -144,7 +176,7 @@ export function PlaybackControls() {
             value={[playbackState.volume]}
             max={100}
             step={1}
-            onValueChange={onVolumeChange}
+            onValueChange={handleVolumeChange}
             disabled={!isDeviceOnline}
             aria-label="Volume control"
           />
@@ -173,15 +205,6 @@ export function PlaybackControls() {
                     })}
                 </SelectContent>
             </Select>
-        </div>
-        
-        <Separator className="my-4 w-full max-w-sm"/>
-
-        <div className="space-y-4 w-full max-w-sm">
-            <h3 className="font-medium text-foreground text-center">DLNA Services</h3>
-            <div className="border rounded-lg p-4 min-h-[80px] bg-background/50 flex items-center justify-center">
-                <p className="text-sm text-muted-foreground text-center">No DLNA devices found on the network yet. The backend service will need to be implemented to discover them.</p>
-            </div>
         </div>
       </CardContent>
     </Card>

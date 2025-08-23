@@ -42,10 +42,12 @@ export interface Source {
   type: string; // e.g., 'spotify', 'line-in', 'dlna'
 }
 
+export type PlayMode = 'sequential' | 'repeat-list' | 'repeat-one' | 'shuffle';
 
 export interface PlaybackState {
     isPlaying: boolean;
     progress: number;
     volume: number;
     source: string;
+    playMode: PlayMode;
 }

@@ -9,7 +9,7 @@ import {
   SidebarInset,
 } from "@/components/ui/sidebar";
 import { DeviceList } from "@/components/DeviceList";
-import type { Device, Schedule, Track, Playlist as PlaylistType, MusicFolder, PlaybackState, Source } from "@/lib/types";
+import type { Device, Schedule, Track, Playlist as PlaylistType, MusicFolder, PlaybackState, Source, PlayMode } from "@/lib/types";
 import { Speaker } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AppHeader } from "./AppHeader";
@@ -37,6 +37,8 @@ export interface AppState {
     schedules: Schedule[];
     track: Track | null;
     playlists: PlaylistType[];
+    nowPlaying: Track[];
+    selectedPlaylistId: string | null;
     availableTracks: Track[];
     availableSources: Source[];
     musicFolders: MusicFolder[];
@@ -46,6 +48,8 @@ export interface AppState {
 export type AppActions = {
     handleSelectDevice: (deviceId: string) => void;
     handleTogglePlay: () => void;
+    handleNextTrack: () => void;
+    handlePrevTrack: () => void;
     handleProgressChange: (value: number[]) => void;
     handleVolumeChange: (value: number[]) => void;
     handleSaveSchedule: (schedule: Omit<Schedule, 'id'>) => void;
@@ -58,6 +62,9 @@ export type AppActions = {
     handleDiscoverDevices: () => Promise<Device[]>;
     handleDeleteDevice: (deviceId: string) => void;
     handleSourceChange: (source: string) => void;
+    handlePlayModeChange: (mode: PlayMode) => void;
+    handleSelectPlaylist: (playlistId: string) => void;
+    handleSelectTrack: (trackId: string) => void;
 };
 
 
@@ -75,21 +82,62 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
   const [devices, setDevices] = React.useState<Device[]>(MOCK_DEVICES);
   const [selectedDeviceId, setSelectedDeviceId] = React.useState<string | null>(MOCK_DEVICES[0]?.id ?? null);
   const [schedules, setSchedules] = React.useState<Schedule[]>([]);
-  const [track, setTrack] = React.useState<Track | null>(MOCK_TRACKS[0]);
+  const [track, setTrack] = React.useState<Track | null>(null);
   const [playlists, setPlaylists] = React.useState<PlaylistType[]>([]);
+  const [nowPlaying, setNowPlaying] = React.useState<Track[]>([]);
+  const [selectedPlaylistId, setSelectedPlaylistId] = React.useState<string | null>(null);
   const [availableTracks, setAvailableTracks] = React.useState<Track[]>(MOCK_TRACKS);
   const [availableSources, setAvailableSources] = React.useState<Source[]>([]);
   const [musicFolders, setMusicFolders] = React.useState<MusicFolder[]>([ { id: '1', path: '/Users/me/Music' } ]);
   const [playbackState, setPlaybackState] = React.useState<PlaybackState>({
     isPlaying: false,
-    progress: 60, 
+    progress: 0,
     volume: 75,
     source: 'local',
+    playMode: 'sequential',
   });
+  const [isLoaded, setIsLoaded] = React.useState(false);
+
 
   const { toast } = useToast();
 
   const selectedDevice = devices.find(d => d.id === selectedDeviceId);
+
+  // Load state from localStorage on initial render
+  React.useEffect(() => {
+    try {
+        const savedState = localStorage.getItem('acousticHarmonyState');
+        if (savedState) {
+            const { playbackState: savedPlayback, selectedPlaylistId: savedPlaylistId } = JSON.parse(savedState);
+            if (savedPlayback) setPlaybackState(prev => ({ ...prev, ...savedPlayback }));
+            if (savedPlaylistId) handleSelectPlaylist(savedPlaylistId, true);
+        }
+    } catch (error) {
+        console.error("Failed to load state from localStorage", error);
+    }
+    setIsLoaded(true);
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, []);
+
+// Save state to localStorage whenever it changes
+React.useEffect(() => {
+    if (!isLoaded) return;
+    try {
+        const stateToSave = {
+            playbackState: {
+                volume: playbackState.volume,
+                source: playbackState.source,
+                playMode: playbackState.playMode,
+                progress: playbackState.progress,
+            },
+            selectedPlaylistId: selectedPlaylistId,
+        };
+        localStorage.setItem('acousticHarmonyState', JSON.stringify(stateToSave));
+    } catch (error) {
+        console.error("Failed to save state to localStorage", error);
+    }
+}, [playbackState.volume, playbackState.source, playbackState.playMode, selectedPlaylistId, isLoaded, playbackState.progress]);
+
 
   React.useEffect(() => {
     if (!selectedDevice || !selectedDevice.online) {
@@ -101,7 +149,6 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
       try {
         const sources = await getAvailableSources(selectedDevice.id, selectedDevice.ip);
         setAvailableSources(sources);
-        // If current source is not available on new device, switch to the first available one
         if (!sources.find(s => s.id === playbackState.source)) {
             handleSourceChange(sources[0]?.id ?? 'local');
         }
@@ -126,9 +173,6 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     const fetchNotifications = async () => {
         while (isMounted) {
             try {
-                // In a real app, you would use the device's IP. 
-                // We will use a placeholder API for demonstration.
-                // The B&O endpoint is /BeoNotify, but we use a mock service.
                 const url = `https://jsonplaceholder.typicode.com/posts/${(Math.floor(Math.random() * 100) + 1)}?_=${Date.now()}`;
                 
                 const response = await fetch(url, { signal });
@@ -142,24 +186,25 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
                 
                 if (signal.aborted) break;
 
-                // Simulate different notification types
                 const randomNotificationType = Math.random();
                 if (randomNotificationType < 0.33) {
-                    // Simulate volume change
                     const newVolume = Math.floor(Math.random() * 101);
                     console.log('Received volume notification:', newVolume);
                     setPlaybackState(prev => ({ ...prev, volume: newVolume }));
                 } else if (randomNotificationType < 0.66) {
-                    // Simulate progress change
-                    const newProgress = Math.floor(Math.random() * (track?.duration ?? 300));
-                    const newIsPlaying = Math.random() > 0.5;
-                    console.log('Received progress notification:', { progress: newProgress, isPlaying: newIsPlaying });
-                    setPlaybackState(prev => ({ ...prev, progress: newProgress, isPlaying: newIsPlaying }));
+                    // Simulate progress change only for local source
+                    if (playbackState.source === 'local') {
+                        const newProgress = Math.floor(Math.random() * (track?.duration ?? 300));
+                        const newIsPlaying = Math.random() > 0.5;
+                        console.log('Received progress notification:', { progress: newProgress, isPlaying: newIsPlaying });
+                        setPlaybackState(prev => ({ ...prev, progress: newProgress, isPlaying: newIsPlaying }));
+                    }
                 } else {
-                    // Simulate track change
-                    const newTrack = MOCK_TRACKS[Math.floor(Math.random() * MOCK_TRACKS.length)];
-                    console.log('Received nowPlaying notification:', newTrack.title);
-                    setTrack(newTrack);
+                    if (playbackState.source === 'local' && nowPlaying.length > 0) {
+                        const newTrack = nowPlaying[Math.floor(Math.random() * nowPlaying.length)];
+                        console.log('Received nowPlaying notification:', newTrack.title);
+                        setTrack(newTrack);
+                    }
                 }
 
 
@@ -173,7 +218,6 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
                     break;
                 }
                 console.error("Notification stream error:", error);
-                // Wait before retrying
                 await new Promise(resolve => setTimeout(resolve, 5000));
             }
         }
@@ -185,16 +229,14 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
         isMounted = false;
         abortController.abort("Component unmounted or dependency changed");
     };
-}, [selectedDeviceId, selectedDevice, track?.duration]);
+}, [selectedDeviceId, selectedDevice, track?.duration, nowPlaying, playbackState.source]);
 
 
   const handleSelectDevice = (deviceId: string) => {
     setSelectedDeviceId(deviceId);
     const device = devices.find(d => d.id === deviceId);
     if (device && device.online) {
-        // Reset state for new device
-        setPlaybackState({ isPlaying: false, progress: 0, volume: 75, source: 'local' });
-        setTrack(MOCK_TRACKS[0] ?? null);
+        setPlaybackState(prev => ({ ...prev, isPlaying: false, progress: 0 }));
     } else {
         setTrack(null);
     }
@@ -209,8 +251,50 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
         });
         return;
     }
+    if (!track && nowPlaying.length > 0) {
+        setTrack(nowPlaying[0]);
+    }
     setPlaybackState(prev => ({ ...prev, isPlaying: !prev.isPlaying }));
   };
+
+  const handleNextTrack = () => {
+    if (!track || nowPlaying.length === 0) return;
+    const currentIndex = nowPlaying.findIndex(t => t.id === track.id);
+    let nextIndex;
+
+    switch (playbackState.playMode) {
+        case 'shuffle':
+            nextIndex = Math.floor(Math.random() * nowPlaying.length);
+            break;
+        case 'repeat-one':
+            nextIndex = currentIndex;
+            break;
+        case 'repeat-list':
+            nextIndex = (currentIndex + 1) % nowPlaying.length;
+            break;
+        case 'sequential':
+        default:
+            nextIndex = currentIndex + 1;
+            if (nextIndex >= nowPlaying.length) {
+                setPlaybackState(prev => ({...prev, isPlaying: false}));
+                return; // Stop at the end of the list
+            }
+            break;
+    }
+    setTrack(nowPlaying[nextIndex]);
+    setPlaybackState(p => ({...p, progress: 0}));
+  }
+
+  const handlePrevTrack = () => {
+      if (!track || nowPlaying.length === 0) return;
+      const currentIndex = nowPlaying.findIndex(t => t.id === track.id);
+      let prevIndex = (currentIndex - 1 + nowPlaying.length) % nowPlaying.length;
+      if (playbackState.playMode === 'shuffle') {
+        prevIndex = Math.floor(Math.random() * nowPlaying.length);
+      }
+      setTrack(nowPlaying[prevIndex]);
+      setPlaybackState(p => ({...p, progress: 0}));
+  }
 
   const handleProgressChange = (value: number[]) => {
     setPlaybackState(prev => ({ ...prev, progress: value[0] }));
@@ -221,16 +305,14 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
   }
 
   const handleSourceChange = (source: string) => {
-    setPlaybackState(prev => ({ ...prev, source }));
+    setPlaybackState(prev => ({ ...prev, source, isPlaying: false, progress: 0 }));
     const sourceName = availableSources.find(s => s.id === source)?.name || source;
     toast({
         title: "Source Changed",
         description: `Switched to ${sourceName}.`,
     });
 
-    if (source === 'local') {
-        setTrack(MOCK_TRACKS[0]);
-    } else {
+    if (source !== 'local') {
         setTrack({
             id: `ext-${source}`,
             title: `Playing from ${sourceName}`,
@@ -238,6 +320,51 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
             albumArtUrl: 'https://placehold.co/300x300.png',
             duration: 0,
         });
+        setNowPlaying([]);
+    } else {
+        if(selectedPlaylistId) {
+            handleSelectPlaylist(selectedPlaylistId);
+        } else {
+            setTrack(null);
+            setNowPlaying([]);
+        }
+    }
+  }
+
+  const handlePlayModeChange = (mode: PlayMode) => {
+    setPlaybackState(prev => ({ ...prev, playMode: mode }));
+    toast({
+        title: "Playback Mode Changed",
+        description: `Mode set to ${mode.replace('-', ' ')}.`,
+    })
+  }
+
+  const handleSelectPlaylist = (playlistId: string, silent = false) => {
+    setSelectedPlaylistId(playlistId);
+    const playlist = playlists.find(p => p.id === playlistId);
+    if (playlist) {
+        const tracksInPlaylist = playlist.trackIds.map(trackId => 
+            availableTracks.find(t => t.id === trackId)
+        ).filter((t): t is Track => !!t);
+        setNowPlaying(tracksInPlaylist);
+        if (tracksInPlaylist.length > 0) {
+            setTrack(tracksInPlaylist[0]);
+            setPlaybackState(p => ({...p, isPlaying: !silent, progress: 0}));
+        } else {
+            setTrack(null);
+            setPlaybackState(p => ({...p, isPlaying: false, progress: 0}));
+        }
+        if (!silent) {
+            toast({ title: `Playlist "${playlist.name}" selected` });
+        }
+    }
+  }
+
+  const handleSelectTrack = (trackId: string) => {
+    const selectedTrack = nowPlaying.find(t => t.id === trackId);
+    if (selectedTrack) {
+        setTrack(selectedTrack);
+        setPlaybackState(p => ({...p, isPlaying: true, progress: 0}));
     }
   }
 
@@ -262,13 +389,23 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
   };
   
   const handleSavePlaylist = (playlist: PlaylistType) => {
-    setPlaylists(prev => {
-        const existing = prev.find(p => p.id === playlist.id);
-        if (existing) {
-            return prev.map(p => p.id === playlist.id ? playlist : p);
-        }
-        return [...prev, playlist];
-    });
+    let newPlaylists;
+    const existing = playlists.find(p => p.id === playlist.id);
+    if (existing) {
+        newPlaylists = playlists.map(p => p.id === playlist.id ? playlist : p);
+    } else {
+        newPlaylists = [...playlists, playlist];
+    }
+    setPlaylists(newPlaylists);
+
+    // If the currently selected playlist was just updated, refresh the nowPlaying list
+    if (selectedPlaylistId === playlist.id) {
+        const tracksInPlaylist = playlist.trackIds.map(trackId => 
+            availableTracks.find(t => t.id === trackId)
+        ).filter((t): t is Track => !!t);
+        setNowPlaying(tracksInPlaylist);
+    }
+
     toast({
         title: "Playlist Saved",
         description: `Playlist "${playlist.name}" has been saved.`,
@@ -277,6 +414,11 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
 
   const handleDeletePlaylist = (playlistId: string) => {
       setPlaylists(prev => prev.filter(p => p.id !== playlistId));
+      if (selectedPlaylistId === playlistId) {
+        setSelectedPlaylistId(null);
+        setNowPlaying([]);
+        setTrack(null);
+      }
       toast({
           title: "Playlist Deleted",
           description: "The playlist has been removed.",
@@ -295,7 +437,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     const newDevice: Device = {
         ...device,
         id: Date.now().toString(),
-        online: true, // Assume online when added
+        online: true, 
     };
     setDevices(prev => [...prev, newDevice]);
     setSelectedDeviceId(newDevice.id);
@@ -333,6 +475,8 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     schedules,
     track,
     playlists,
+    nowPlaying,
+    selectedPlaylistId,
     availableTracks,
     availableSources,
     musicFolders,
@@ -342,6 +486,8 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
   const actions: AppActions = {
     handleSelectDevice,
     handleTogglePlay,
+    handleNextTrack,
+    handlePrevTrack,
     handleProgressChange,
     handleVolumeChange,
     handleSaveSchedule,
@@ -354,6 +500,9 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     handleDiscoverDevices,
     handleDeleteDevice,
     handleSourceChange,
+    handlePlayModeChange,
+    handleSelectPlaylist,
+    handleSelectTrack,
   };
 
   return (
