@@ -133,7 +133,7 @@ export default function AcousticHarmonyApp() {
 
     return () => {
         isMounted = false;
-        abortController.abort();
+        abortController.abort("Component unmounted or dependency changed");
     };
 }, [selectedDeviceId, selectedDevice, track?.duration]);
 
