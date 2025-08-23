@@ -22,18 +22,16 @@ export function AppNavigation() {
             <SidebarMenu>
                 {NAV_ITEMS.map((item) => (
                     <SidebarMenuItem key={item.href}>
-                        <Link href={item.href} passHref>
-                            <SidebarMenuButton
-                                asChild
-                                isActive={pathname.startsWith(item.href)}
-                                tooltip={{ children: item.label, side: 'right', align: 'center' }}
-                            >
-                                <div>
+                        <SidebarMenuButton
+                            asChild
+                            isActive={pathname.startsWith(item.href)}
+                            tooltip={{ children: item.label, side: 'right', align: 'center' }}
+                        >
+                            <Link href={item.href}>
                                 <item.icon />
                                 <span>{item.label}</span>
-                                </div>
-                            </SidebarMenuButton>
-                        </Link>
+                            </Link>
+                        </SidebarMenuButton>
                     </SidebarMenuItem>
                 ))}
             </SidebarMenu>
