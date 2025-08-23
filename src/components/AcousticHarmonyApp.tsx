@@ -9,7 +9,7 @@ import {
   SidebarInset,
 } from "@/components/ui/sidebar";
 import { DeviceList } from "@/components/DeviceList";
-import type { Device, Schedule, Track, Playlist as PlaylistType, MusicFolder, PlaybackState, Source, PlayMode, NewDevice } from "@/lib/types";
+import type { Device, Schedule, Track, Playlist as PlaylistType, MusicFolder, PlaybackState, Source, PlayMode, NewDevice, PlayState } from "@/lib/types";
 import { Speaker } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AppHeader } from "./AppHeader";
@@ -109,17 +109,19 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
         setDevices(initialDevices);
         if (initialDevices.length > 0) {
             const savedState = localStorage.getItem('acousticHarmonyState');
+            let deviceToSelect = initialDevices[0].id;
             if (savedState) {
                 const { selectedDeviceId: savedDeviceId } = JSON.parse(savedState);
                 if (savedDeviceId && initialDevices.find(d => d.id === savedDeviceId)) {
-                    setSelectedDeviceId(savedDeviceId);
-                    return;
+                    deviceToSelect = savedDeviceId;
                 }
             }
-            setSelectedDeviceId(initialDevices[0].id);
+            // We call handleSelectDevice to ensure all state is correctly initialized
+            handleSelectDevice(deviceToSelect);
         }
     }
     loadInitialData();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Load state from localStorage on initial render
@@ -130,7 +132,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
             const { playbackState: savedPlayback, selectedPlaylistId: savedPlaylistId, selectedDeviceId: savedDeviceId } = JSON.parse(savedState);
             if (savedPlayback) setPlaybackState(prev => ({ ...prev, ...savedPlayback }));
             if (savedPlaylistId) handleSelectPlaylist(savedPlaylistId, true);
-            if (savedDeviceId) setSelectedDeviceId(savedDeviceId);
+            // Device selection is handled in the initial data loading effect
         }
     } catch (error) {
         console.error("Failed to load state from localStorage", error);
@@ -158,20 +160,26 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
       }
   }, [playbackState.volume, playbackState.source, playbackState.playMode, selectedPlaylistId, selectedDeviceId, isLoaded]);
 
-  // Fetch available sources when device changes
+  // Fetch initial state and available sources when device changes
   React.useEffect(() => {
     if (!selectedDevice || !selectedDevice.online) {
       setAvailableSources([]);
       return;
     }
 
-    const fetchSources = async () => {
+    const fetchInitialDataForDevice = async () => {
       try {
+        // Get the full initial state first
+        const initialState = await getPlaybackState(selectedDevice.id, selectedDevice.ip);
+        setPlaybackState(initialState);
+        setTrack(initialState.track);
+
+        // Then fetch available sources
         const sources = await getAvailableSources(selectedDevice.id, selectedDevice.ip);
         setAvailableSources(sources);
         
-        const isCurrentSourceValid = sources.some(s => s.id === playbackState.source);
-        
+        // Ensure the current source is valid
+        const isCurrentSourceValid = sources.some(s => s.id === initialState.source);
         if (!isCurrentSourceValid && sources.length > 0) {
             handleSourceChange(sources[0].id);
         } else if (!isCurrentSourceValid) {
@@ -179,45 +187,96 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
         }
 
       } catch (error) {
-        toast({ variant: "destructive", title: "Failed to get sources" });
+        toast({ variant: "destructive", title: "Failed to get device info" });
         setAvailableSources([]);
+        setPlaybackState({
+            state: "stopped", progress: 0, volume: 50, source: 'local', playMode: 'sequential', track: null
+        });
+        setTrack(null);
       }
     };
-    fetchSources();
+    
+    fetchInitialDataForDevice();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDevice]);
 
-  // Poll for playback state
+  // Long-polling for real-time notifications
   React.useEffect(() => {
-    const pollPlaybackState = async () => {
-        if (selectedDevice?.online) {
+    if (!selectedDevice || !selectedDevice.online) {
+        return;
+    }
+
+    const abortController = new AbortController();
+    const signal = abortController.signal;
+
+    const listenForNotifications = async () => {
+        console.log(`Starting notification listener for ${selectedDevice.name}...`);
+        while (!signal.aborted) {
             try {
-                const state = await getPlaybackState(selectedDevice.id, selectedDevice.ip);
-                setPlaybackState(state);
-                setTrack(state.track);
+                const response = await fetch(`/api/notifications/${selectedDevice.ip}`, { signal });
+
+                if (!response.ok) {
+                    if (signal.aborted) break;
+                    console.error(`Notification request failed with status ${response.status}. Retrying in 5s.`);
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                    continue;
+                }
+
+                const notification = await response.json();
+                
+                // Process the notification and update state
+                if (notification.type === 'VOLUME') {
+                    setPlaybackState(prev => ({...prev, volume: notification.data.speaker.level}));
+                }
+                if (notification.type === 'PROGRESS_INFORMATION') {
+                    setPlaybackState(prev => ({
+                        ...prev, 
+                        progress: notification.data.progress,
+                        state: notification.data.state as PlayState,
+                    }));
+                    if (notification.data.track) {
+                        setTrack(notification.data.track);
+                    }
+                }
+                if (notification.type === 'SOURCE') {
+                    setPlaybackState(prev => ({...prev, source: notification.data.primarySource.id}));
+                }
+                if (notification.type === 'PLAY_STATE') {
+                    setPlaybackState(prev => ({
+                        ...prev,
+                        state: notification.data.state as PlayState,
+                        playMode: notification.data.playQueue.shuffle, // This might need adjustment based on real API data
+                    }));
+                }
+
             } catch (error) {
-                console.error("Failed to poll playback state", error);
+                if (!signal.aborted) {
+                    console.error("Error in notification listener:", error);
+                    // Wait before retrying to avoid spamming requests on persistent failure
+                    await new Promise(resolve => setTimeout(resolve, 5000));
+                }
             }
         }
+        console.log(`Notification listener for ${selectedDevice.name} stopped.`);
     };
 
-    const intervalId = setInterval(pollPlaybackState, 2000); // Poll every 2 seconds
+    listenForNotifications();
 
-    return () => clearInterval(intervalId);
+    return () => {
+        console.log(`Aborting notification listener for ${selectedDevice.name}.`);
+        abortController.abort();
+    };
   }, [selectedDevice]);
 
 
   const handleSelectDevice = (deviceId: string) => {
     setSelectedDeviceId(deviceId);
+    // Reset state for the new device, will be populated by effects
     setPlaybackState({
-        state: "stopped",
-        progress: 0,
-        volume: 50,
-        source: 'local',
-        playMode: 'sequential',
-        track: null,
+        state: "stopped", progress: 0, volume: 50, source: 'local', playMode: 'sequential', track: null,
     });
     setTrack(null);
+    setAvailableSources([]);
   };
 
   const handleTogglePlay = async () => {
@@ -225,6 +284,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     const newState = playbackState.state === 'playing' ? 'paused' : 'playing';
     try {
         await setDevicePlaybackState(selectedDevice.id, selectedDevice.ip, newState);
+        // The state will be updated by the notification listener, but we can do an optimistic update for responsiveness
         setPlaybackState(prev => ({...prev, state: newState}));
     } catch (error) {
         toast({ variant: "destructive", title: "Failed to toggle play state" });
@@ -252,7 +312,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
   const handleSeek = async (value: number[]) => {
     if (!selectedDevice?.online || !track) return;
     const newProgress = value[0];
-    setPlaybackState(prev => ({ ...prev, progress: newProgress }));
+    setPlaybackState(prev => ({ ...prev, progress: newProgress })); // Optimistic update
     try {
         await seekTo(selectedDevice.id, selectedDevice.ip, newProgress);
     } catch (error) {
@@ -263,7 +323,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
   const handleVolumeChange = async (value: number[]) => {
     if (!selectedDevice?.online) return;
     const newVolume = value[0];
-    setPlaybackState(prev => ({ ...prev, volume: newVolume }));
+    setPlaybackState(prev => ({ ...prev, volume: newVolume })); // Optimistic update
     try {
         await setDeviceVolume(selectedDevice.id, selectedDevice.ip, newVolume);
     } catch (error) {
@@ -276,7 +336,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     if (!selectedDevice) return;
     try {
         await changeSource(selectedDevice.id, selectedDevice.ip, source);
-        setPlaybackState(prev => ({ ...prev, source }));
+        setPlaybackState(prev => ({ ...prev, source })); // Optimistic update
     } catch (error) {
         toast({ variant: "destructive", title: "Failed to change source" });
     }
@@ -286,7 +346,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     if (!selectedDevice) return;
     try {
         await setDevicePlayMode(selectedDevice.id, selectedDevice.ip, mode);
-        setPlaybackState(prev => ({ ...prev, playMode: mode }));
+        setPlaybackState(prev => ({ ...prev, playMode: mode })); // Optimistic update
         toast({
             title: "Playback Mode Changed",
             description: `Mode set to ${mode.replace('-', ' ')}.`,
@@ -497,5 +557,3 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     </AppContext.Provider>
   );
 }
-
-    
