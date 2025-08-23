@@ -1,11 +1,40 @@
 
 "use server";
 
-import type { Device, Source } from "./types";
+import type { Device, NewDevice, Source } from "./types";
+import { getDb, saveDb } from "./db";
+import { randomUUID } from "crypto";
+
+export async function getDevices(): Promise<Device[]> {
+  const db = await getDb();
+  // Here you could add logic to check the online status of each device
+  const devicesWithOnlineStatus = db.devices.map(d => ({...d, online: true}));
+  return devicesWithOnlineStatus;
+}
+
+export async function addDevice(device: NewDevice): Promise<Device> {
+    const db = await getDb();
+    const newDevice: Device = { ...device, id: randomUUID(), online: true };
+    db.devices.push(newDevice);
+    await saveDb(db);
+    return newDevice;
+}
+
+export async function deleteDevice(deviceId: string): Promise<{success: boolean}> {
+    const db = await getDb();
+    const initialLength = db.devices.length;
+    db.devices = db.devices.filter(d => d.id !== deviceId);
+    if (db.devices.length < initialLength) {
+        await saveDb(db);
+        return { success: true };
+    }
+    return { success: false };
+}
+
 
 // This function now attempts to connect to a local backend service
 // that is responsible for scanning the local network for devices.
-export async function discoverDevices(): Promise<Device[]> {
+export async function discoverDevices(): Promise<Omit<Device, 'id' | 'online'>[]> {
   console.log("Attempting to scan for B&O devices via local discovery service...");
   try {
     // This endpoint should be provided by a local helper service/backend

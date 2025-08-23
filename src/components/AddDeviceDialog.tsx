@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Loader2, Plus } from "lucide-react";
 import { useAppContext } from "./AcousticHarmonyApp";
-import type { Device } from "@/lib/types";
+import type { NewDevice } from "@/lib/types";
 import { ScrollArea } from "./ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 
@@ -45,7 +45,7 @@ export function AddDeviceDialog({ children }: { children: React.ReactNode }) {
     const [open, setOpen] = React.useState(false);
     const [isScanning, setIsScanning] = React.useState(false);
     const [scanError, setScanError] = React.useState<string | null>(null);
-    const [discoveredDevices, setDiscoveredDevices] = React.useState<Device[]>([]);
+    const [discoveredDevices, setDiscoveredDevices] = React.useState<NewDevice[]>([]);
 
     const form = useForm<ManualAddFormValues>({
         resolver: zodResolver(manualAddSchema),
@@ -72,7 +72,7 @@ export function AddDeviceDialog({ children }: { children: React.ReactNode }) {
         }
     };
 
-    const handleAddFromDiscovery = (device: Device) => {
+    const handleAddFromDiscovery = (device: NewDevice) => {
         actions.handleAddDevice({ name: device.name, ip: device.ip });
         setOpen(false);
     }
@@ -130,8 +130,8 @@ export function AddDeviceDialog({ children }: { children: React.ReactNode }) {
                                     </div>
                                 )}
                                 <div className="space-y-2">
-                                {discoveredDevices.map((device) => (
-                                    <div key={device.id} className="flex items-center justify-between p-2 rounded-md hover:bg-muted">
+                                {discoveredDevices.map((device, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-2 rounded-md hover:bg-muted">
                                         <div>
                                             <p className="font-medium">{device.name}</p>
                                             <p className="text-sm text-muted-foreground">{device.ip}</p>

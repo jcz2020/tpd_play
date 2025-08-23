@@ -9,12 +9,12 @@ import {
   SidebarInset,
 } from "@/components/ui/sidebar";
 import { DeviceList } from "@/components/DeviceList";
-import type { Device, Schedule, Track, Playlist as PlaylistType, MusicFolder, PlaybackState, Source, PlayMode } from "@/lib/types";
+import type { Device, Schedule, Track, Playlist as PlaylistType, MusicFolder, PlaybackState, Source, PlayMode, NewDevice } from "@/lib/types";
 import { Speaker } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AppHeader } from "./AppHeader";
 import { AppNavigation } from "./AppNavigation";
-import { discoverDevices, getAvailableSources } from "@/lib/actions";
+import { discoverDevices, getAvailableSources, getDevices, addDevice, deleteDevice } from "@/lib/actions";
 
 export interface AppState {
     devices: Device[];
@@ -43,8 +43,8 @@ export type AppActions = {
     handleSavePlaylist: (playlist: PlaylistType) => void;
     handleDeletePlaylist: (playlistId: string) => void;
     handleMusicFoldersChange: (folders: MusicFolder[]) => void;
-    handleAddDevice: (device: Omit<Device, 'id' | 'online'>) => void;
-    handleDiscoverDevices: () => Promise<Device[]>;
+    handleAddDevice: (device: NewDevice) => void;
+    handleDiscoverDevices: () => Promise<Omit<Device, 'id' | 'online'>[]>;
     handleDeleteDevice: (deviceId: string) => void;
     handleSourceChange: (source: string) => void;
     handlePlayModeChange: (mode: PlayMode) => void;
@@ -87,6 +87,17 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
   const { toast } = useToast();
 
   const selectedDevice = devices.find(d => d.id === selectedDeviceId);
+
+  React.useEffect(() => {
+    const loadInitialData = async () => {
+        const initialDevices = await getDevices();
+        setDevices(initialDevices);
+        if (initialDevices.length > 0) {
+            setSelectedDeviceId(initialDevices[0].id);
+        }
+    }
+    loadInitialData();
+  }, [])
 
   // Load state from localStorage on initial render
   React.useEffect(() => {
@@ -347,12 +358,8 @@ React.useEffect(() => {
     });
   }
 
-  const handleAddDevice = (device: Omit<Device, 'id' | 'online'>) => {
-    const newDevice: Device = {
-        ...device,
-        id: Date.now().toString(),
-        online: true, 
-    };
+  const handleAddDevice = async (device: NewDevice) => {
+    const newDevice = await addDevice(device);
     setDevices(prev => [...prev, newDevice]);
     setSelectedDeviceId(newDevice.id);
     toast({
@@ -361,22 +368,32 @@ React.useEffect(() => {
     });
   };
 
-  const handleDeleteDevice = (deviceId: string) => {
+  const handleDeleteDevice = async (deviceId: string) => {
     const deletedDevice = devices.find(d => d.id === deviceId);
     if (!deletedDevice) return;
 
-    setDevices(prev => {
-        const newDevices = prev.filter(d => d.id !== deviceId);
-        if (selectedDeviceId === deviceId) {
-            setSelectedDeviceId(newDevices[0]?.id ?? null);
-        }
-        return newDevices;
-    });
+    const result = await deleteDevice(deviceId);
 
-    toast({
-        title: "Device Removed",
-        description: `${deletedDevice.name} has been removed.`,
-    });
+    if (result.success) {
+        setDevices(prev => {
+            const newDevices = prev.filter(d => d.id !== deviceId);
+            if (selectedDeviceId === deviceId) {
+                setSelectedDeviceId(newDevices[0]?.id ?? null);
+            }
+            return newDevices;
+        });
+
+        toast({
+            title: "Device Removed",
+            description: `${deletedDevice.name} has been removed.`,
+        });
+    } else {
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: `Failed to remove ${deletedDevice.name}.`,
+        });
+    }
   };
 
   const handleDiscoverDevices = async () => {

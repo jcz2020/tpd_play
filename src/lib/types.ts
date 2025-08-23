@@ -1,8 +1,11 @@
 
-export interface Device {
-  id: string;
+export interface NewDevice {
   name: string;
   ip: string;
+}
+
+export interface Device extends NewDevice {
+  id: string;
   online: boolean;
 }
 
