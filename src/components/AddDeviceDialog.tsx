@@ -62,11 +62,12 @@ export function AddDeviceDialog({ children }: { children: React.ReactNode }) {
         try {
             const foundDevices = await actions.handleDiscoverDevices();
             if (foundDevices.length === 0) {
-                setScanError("No devices found. Ensure the local discovery service is running and your devices are on the same network.");
+                setScanError("No new devices found. Ensure they are on the same network and the local discovery service is running.");
             }
             setDiscoveredDevices(foundDevices);
         } catch (error) {
-            setScanError("Failed to connect to the local discovery service. Please ensure it's running and accessible.");
+            console.error(error);
+            setScanError("Failed to connect to the discovery service. Please ensure it's running.");
         } finally {
             setIsScanning(false);
         }
@@ -74,7 +75,12 @@ export function AddDeviceDialog({ children }: { children: React.ReactNode }) {
 
     const handleAddFromDiscovery = (device: NewDevice) => {
         actions.handleAddDevice({ name: device.name, ip: device.ip });
-        setOpen(false);
+        // Optimistically remove from discovered list
+        setDiscoveredDevices(prev => prev.filter(d => d.ip !== device.ip));
+        // Close dialog if it was the last one
+        if (discoveredDevices.length === 1) {
+            setOpen(false);
+        }
     }
     
     const onManualSubmit = (data: ManualAddFormValues) => {
@@ -85,7 +91,10 @@ export function AddDeviceDialog({ children }: { children: React.ReactNode }) {
 
     const handleOpenChange = (isOpen: boolean) => {
         setOpen(isOpen);
-        if (!isOpen) {
+        if (isOpen) {
+            // Automatically scan when dialog opens
+            handleScan();
+        } else {
             // Reset state when closing
             setIsScanning(false);
             setDiscoveredDevices([]);
@@ -113,11 +122,11 @@ export function AddDeviceDialog({ children }: { children: React.ReactNode }) {
                         <div className="space-y-4">
                             <Button onClick={handleScan} disabled={isScanning} className="w-full">
                                 {isScanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                                {isScanning ? "Scanning..." : "Scan Network"}
+                                {isScanning ? "Scanning..." : "Scan Again"}
                             </Button>
                             <ScrollArea className="h-60 rounded-md border">
                                 <div className="p-4">
-                                {isScanning && (
+                                {isScanning && discoveredDevices.length === 0 && (
                                     <div className="flex justify-center items-center h-full">
                                         <p className="text-muted-foreground">Searching for devices...</p>
                                     </div>
@@ -125,7 +134,7 @@ export function AddDeviceDialog({ children }: { children: React.ReactNode }) {
                                 {!isScanning && discoveredDevices.length === 0 && (
                                     <div className="flex justify-center items-center h-full text-center">
                                         <p className="text-sm text-muted-foreground p-4">
-                                            {scanError ? scanError : 'Click "Scan Network" to search for devices. This requires a local discovery service to be running on your computer.'}
+                                            {scanError ? scanError : 'No new devices found. Try scanning again.'}
                                         </p>
                                     </div>
                                 )}

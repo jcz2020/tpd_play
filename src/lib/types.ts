@@ -16,7 +16,7 @@ export interface Track {
   artist: string;
   albumArtUrl: string;
   duration: number; // in seconds
-  path: string; //
+  path?: string; 
 }
 
 export type ScheduleAction = 'on' | 'off';
@@ -59,5 +59,3 @@ export interface PlaybackState {
     playMode: PlayMode;
     track: Track | null;
 }
-
-    

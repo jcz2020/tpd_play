@@ -21,13 +21,14 @@ function formatTime(seconds: number) {
 }
 
 const sourceIcons: { [key: string]: React.ElementType } = {
-    local: Library,
     spotify: Disc,
     tidal: Disc,
     deezer: Disc,
     dlna: Radio,
     bluetooth: Bluetooth,
-    "line-in": AudioLines
+    linein: AudioLines, // B&O uses "linein"
+    local: Library,
+    // Add other potential source types here
 }
 
 export function PlaybackControls() {
@@ -38,39 +39,33 @@ export function PlaybackControls() {
   
   const device = state.devices.find(d => d.id === state.selectedDeviceId);
 
+  // We use a local state for the volume slider to avoid spamming the API on every little move.
+  // The actual volume is only sent on commit (when the user lets go of the slider).
+  const [localVolume, setLocalVolume] = React.useState(playbackState.volume);
   const [isMuted, setIsMuted] = React.useState(false);
   const lastVolumeRef = React.useRef(playbackState.volume);
+
+  React.useEffect(() => {
+    setLocalVolume(playbackState.volume);
+    setIsMuted(playbackState.volume === 0);
+  }, [playbackState.volume]);
 
   const handleMuteToggle = () => {
     if (isMuted) {
         handleVolumeChange([lastVolumeRef.current]);
-        setIsMuted(false);
     } else {
         lastVolumeRef.current = playbackState.volume;
         handleVolumeChange([0]);
-        setIsMuted(true);
     }
   }
-
-  React.useEffect(() => {
-    setIsMuted(playbackState.volume === 0);
-  }, [playbackState.volume])
-
 
   const isDeviceOnline = !!device?.online;
   const isLocalSource = playbackState.source === 'local';
   const trackDuration = track?.duration ?? 0;
-  const currentProgress = Math.min(playbackState.progress, trackDuration);
+  const currentProgress = playbackState.progress;
   
-  const sourceInfo = availableSources.find(s => s.id === playbackState.source)
+  const sourceInfo = availableSources.find(s => s.id === playbackState.source);
   const CurrentSourceIcon = sourceIcons[sourceInfo?.type ?? 'local'] || Music;
-
-  const PlayModeIcon = {
-    'sequential': Repeat,
-    'repeat-list': Repeat,
-    'repeat-one': Repeat1,
-    'shuffle': Shuffle,
-  }[playbackState.playMode];
 
   const nextPlayMode = () => {
     const modes = ['sequential', 'repeat-list', 'repeat-one', 'shuffle'];
@@ -78,6 +73,13 @@ export function PlaybackControls() {
     const nextIndex = (currentIndex + 1) % modes.length;
     handlePlayModeChange(modes[nextIndex] as any);
   }
+
+  const playModeInfo = {
+    'sequential': { Icon: Repeat, label: 'Sequential' },
+    'repeat-list': { Icon: Repeat, label: 'Repeat List' },
+    'repeat-one': { Icon: Repeat1, label: 'Repeat One' },
+    'shuffle': { Icon: Shuffle, label: 'Shuffle' },
+  }[playbackState.playMode];
   
   const isPlaying = playbackState.state === 'playing';
 
@@ -87,7 +89,7 @@ export function PlaybackControls() {
       <CardHeader className="text-center">
         <h2 className="text-xl font-semibold">{device?.name ?? "No Device Selected"}</h2>
         <p className="text-sm text-muted-foreground">
-          {isDeviceOnline ? (track ? `Playing on ${device.ip}` : "Ready to play") : "Device is offline"}
+          {isDeviceOnline ? (track ? `Playing via ${sourceInfo?.name ?? playbackState.source}` : "Ready to play") : "Device is offline"}
         </p>
       </CardHeader>
       <CardContent className="flex flex-col items-center space-y-4">
@@ -115,7 +117,7 @@ export function PlaybackControls() {
         </div>
 
         <div className="text-center w-full min-h-[4rem] pt-4">
-          <h3 className="text-2xl font-semibold tracking-tight">{track?.title ?? "Nothing playing"}</h3>
+          <h3 className="text-2xl font-semibold tracking-tight truncate">{track?.title ?? "Nothing playing"}</h3>
           <p className="text-sm text-muted-foreground mt-1">{track?.artist ?? "—"}</p>
         </div>
 
@@ -123,10 +125,10 @@ export function PlaybackControls() {
             <div className="px-1">
             <Slider
                 value={[currentProgress]}
-                max={trackDuration}
+                max={trackDuration > 0 ? trackDuration : 100}
                 step={1}
                 onValueChange={handleSeek}
-                disabled={!isDeviceOnline || !track || !isLocalSource}
+                disabled={!isDeviceOnline || !track}
                 aria-label="Track progress"
             />
             </div>
@@ -139,14 +141,14 @@ export function PlaybackControls() {
         <div className="flex items-center justify-center space-x-2 w-full py-2">
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !track || !isLocalSource} className="w-12 h-12 text-muted-foreground hover:text-foreground">
+                    <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !isLocalSource} className="w-12 h-12 text-muted-foreground hover:text-foreground">
                         <Shuffle className={cn(playbackState.playMode === 'shuffle' && 'text-primary')} />
                     </Button>
                 </TooltipTrigger>
                 <TooltipContent><p>Shuffle</p></TooltipContent>
             </Tooltip>
 
-          <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !track || !isLocalSource} className="w-12 h-12" onClick={handlePrevTrack}>
+          <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !isLocalSource} className="w-12 h-12" onClick={handlePrevTrack}>
             <Rewind className="h-6 w-6" />
           </Button>
           <Button 
@@ -158,29 +160,30 @@ export function PlaybackControls() {
             >
             {isPlaying ? <Pause className="h-8 w-8 fill-primary-foreground" /> : <Play className="h-8 w-8 fill-primary-foreground" />}
           </Button>
-          <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !track || !isLocalSource} className="w-12 h-12" onClick={handleNextTrack}>
+          <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !isLocalSource} className="w-12 h-12" onClick={handleNextTrack}>
             <FastForward className="h-6 w-6" />
           </Button>
           
           <Tooltip>
                 <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !track || !isLocalSource} className="w-12 h-12 text-muted-foreground hover:text-foreground" onClick={nextPlayMode}>
-                         <PlayModeIcon className={cn((playbackState.playMode === 'repeat-list' || playbackState.playMode === 'repeat-one') && 'text-primary')} />
+                    <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !isLocalSource} className="w-12 h-12 text-muted-foreground hover:text-foreground" onClick={nextPlayMode}>
+                         <playModeInfo.Icon className={cn((playbackState.playMode === 'repeat-list' || playbackState.playMode === 'repeat-one') && 'text-primary')} />
                     </Button>
                 </TooltipTrigger>
-                <TooltipContent><p>{playbackState.playMode.replace('-', ' ')}</p></TooltipContent>
+                <TooltipContent><p>{playModeInfo.label}</p></TooltipContent>
             </Tooltip>
         </div>
 
         <div className="flex items-center space-x-3 w-full max-w-sm pt-2">
           <Button variant="ghost" size="icon" onClick={handleMuteToggle} disabled={!isDeviceOnline} className="text-muted-foreground hover:text-foreground">
-            {playbackState.volume === 0 ? <VolumeX className="h-5 w-5"/> : <Volume2 className="h-5 w-5" />}
+            {isMuted ? <VolumeX className="h-5 w-5"/> : <Volume2 className="h-5 w-5" />}
           </Button>
           <Slider
-            value={[playbackState.volume]}
+            value={[localVolume]}
             max={100}
             step={1}
-            onValueChange={handleVolumeChange}
+            onValueChange={(value) => setLocalVolume(value[0])}
+            onValueCommit={handleVolumeChange}
             disabled={!isDeviceOnline}
             aria-label="Volume control"
           />
@@ -192,7 +195,7 @@ export function PlaybackControls() {
                 <SelectTrigger id="source-select" className="w-full">
                     <div className="flex items-center gap-2">
                         <CurrentSourceIcon className="h-4 w-4" />
-                        <SelectValue placeholder="Select a source" />
+                        <SelectValue placeholder="Select a source..." />
                     </div>
                 </SelectTrigger>
                 <SelectContent>
@@ -215,5 +218,3 @@ export function PlaybackControls() {
     </TooltipProvider>
   );
 }
-
-    

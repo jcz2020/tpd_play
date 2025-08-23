@@ -26,7 +26,7 @@ export function NowPlayingList() {
                 </CardHeader>
                 <CardContent className="flex flex-col items-center justify-center h-5/6 text-muted-foreground">
                     <Music className="w-16 h-16 mb-4" />
-                    <p>Select 'Local Library' to view playlists.</p>
+                    <p>Select 'Local Library' as the source to view playlists.</p>
                 </CardContent>
             </Card>
         )
@@ -82,7 +82,7 @@ export function NowPlayingList() {
                         ))}
                          {nowPlaying.length === 0 && selectedPlaylistId && (
                             <div className="text-center text-muted-foreground py-8">
-                                This playlist is empty.
+                                This playlist is empty. Add tracks in the Media tab.
                             </div>
                         )}
                         {nowPlaying.length === 0 && !selectedPlaylistId && (

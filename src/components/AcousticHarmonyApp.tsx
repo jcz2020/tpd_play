@@ -33,7 +33,6 @@ import {
     getAvailableTracks,
     scanMusicFolders as scanDeviceMusicFolders
 } from "@/lib/actions";
-import { randomUUID } from "crypto";
 
 export interface AppState {
     devices: Device[];
@@ -106,7 +105,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
 
   const selectedDevice = React.useMemo(() => devices.find(d => d.id === selectedDeviceId), [devices, selectedDeviceId]);
 
-  // Initial data loading
+  // Effect to load initial data from server and localStorage
   React.useEffect(() => {
     const loadInitialData = async () => {
         const [
@@ -123,96 +122,80 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
         setMusicFolders(initialMusicFolders);
         setAvailableTracks(initialTracks);
 
-        if (initialDevices.length > 0) {
+        let deviceToSelect : string | null = null;
+        try {
             const savedState = localStorage.getItem('acousticHarmonyState');
-            let deviceToSelect = initialDevices[0].id;
             if (savedState) {
                 const { selectedDeviceId: savedDeviceId } = JSON.parse(savedState);
-                if (savedDeviceId && initialDevices.find(d => d.id === savedDeviceId)) {
+                if (savedDeviceId && initialDevices.some(d => d.id === savedDeviceId)) {
                     deviceToSelect = savedDeviceId;
                 }
             }
-            // We call handleSelectDevice to ensure all state is correctly initialized
-            handleSelectDevice(deviceToSelect);
+        } catch (error) {
+            console.error("Failed to load state from localStorage", error);
         }
+        
+        if (!deviceToSelect && initialDevices.length > 0) {
+            deviceToSelect = initialDevices[0].id;
+        }
+        
+        if (deviceToSelect) {
+            setSelectedDeviceId(deviceToSelect);
+        }
+        setIsLoaded(true); // Mark initial loading as complete
     }
     loadInitialData();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  // Load state from localStorage on initial render
-  React.useEffect(() => {
-    try {
-        const savedState = localStorage.getItem('acousticHarmonyState');
-        if (savedState) {
-            const { playbackState: savedPlayback, selectedPlaylistId: savedPlaylistId, selectedDeviceId: savedDeviceId } = JSON.parse(savedState);
-            if (savedPlayback) setPlaybackState(prev => ({ ...prev, ...savedPlayback }));
-            if (savedPlaylistId) handleSelectPlaylist(savedPlaylistId, true);
-            // Device selection is handled in the initial data loading effect
-        }
-    } catch (error) {
-        console.error("Failed to load state from localStorage", error);
-    }
-    setIsLoaded(true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Save state to localStorage whenever it changes
   React.useEffect(() => {
-      if (!isLoaded) return;
+      if (!isLoaded) return; // Only save after initial load
       try {
           const stateToSave = {
-              playbackState: {
+              selectedDeviceId,
+              selectedPlaylistId,
+              playbackState: { // Only save non-volatile state
                   volume: playbackState.volume,
-                  source: playbackState.source,
                   playMode: playbackState.playMode,
               },
-              selectedPlaylistId,
-              selectedDeviceId,
           };
           localStorage.setItem('acousticHarmonyState', JSON.stringify(stateToSave));
       } catch (error) {
           console.error("Failed to save state to localStorage", error);
       }
-  }, [playbackState.volume, playbackState.source, playbackState.playMode, selectedPlaylistId, selectedDeviceId, isLoaded]);
+  }, [selectedDeviceId, selectedPlaylistId, playbackState.volume, playbackState.playMode, isLoaded]);
 
-  // Fetch initial state and available sources when device changes
+  // Fetch device-specific data when the selected device changes
   React.useEffect(() => {
-    if (!selectedDevice || !selectedDevice.online) {
-      setAvailableSources([]);
-      return;
-    }
+    if (!selectedDevice || !isLoaded) return;
 
-    const fetchInitialDataForDevice = async () => {
+    const fetchDeviceData = async () => {
+      if (!selectedDevice.online) {
+        setPlaybackState({ state: "stopped", progress: 0, volume: 50, source: 'local', playMode: 'sequential', track: null });
+        setAvailableSources([]);
+        return;
+      }
+      
       try {
-        // Get the full initial state first
-        const initialState = await getPlaybackState(selectedDevice.id, selectedDevice.ip);
-        setPlaybackState(initialState);
+        const [initialState, sources] = await Promise.all([
+            getPlaybackState(selectedDevice.id, selectedDevice.ip),
+            getAvailableSources(selectedDevice.id, selectedDevice.ip),
+        ]);
 
-        // Then fetch available sources
-        const sources = await getAvailableSources(selectedDevice.id, selectedDevice.ip);
+        setPlaybackState(initialState);
         setAvailableSources(sources);
-        
-        // Ensure the current source is valid
-        const isCurrentSourceValid = sources.some(s => s.id === initialState.source);
-        if (!isCurrentSourceValid && sources.length > 0) {
-            handleSourceChange(sources[0].id);
-        } else if (!isCurrentSourceValid) {
-            handleSourceChange('local');
-        }
 
       } catch (error) {
+        console.error(`Failed to fetch data for device ${selectedDevice.id}`, error);
         toast({ variant: "destructive", title: "Failed to get device info" });
+        setPlaybackState({ state: "stopped", progress: 0, volume: 50, source: 'local', playMode: 'sequential', track: null });
         setAvailableSources([]);
-        setPlaybackState({
-            state: "stopped", progress: 0, volume: 50, source: 'local', playMode: 'sequential', track: null
-        });
       }
     };
     
-    fetchInitialDataForDevice();
+    fetchDeviceData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDevice]);
+  }, [selectedDevice, isLoaded]);
 
   // Long-polling for real-time notifications
   React.useEffect(() => {
@@ -229,8 +212,12 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
             try {
                 const response = await fetch(`/api/notifications/${selectedDevice.ip}`, { signal });
 
+                if (response.status === 204 || signal.aborted) {
+                    // Request was aborted (client disconnect or timeout on server), just break the loop
+                    break;
+                }
+
                 if (!response.ok) {
-                    if (signal.aborted) break;
                     console.error(`Notification request failed with status ${response.status}. Retrying in 5s.`);
                     await new Promise(resolve => setTimeout(resolve, 5000));
                     continue;
@@ -239,39 +226,40 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
                 const notification = await response.json();
                 
                 // Process the notification and update state
-                if (notification.type === 'VOLUME') {
+                if (notification?.type === 'VOLUME' && notification.data?.speaker?.level) {
                     setPlaybackState(prev => ({...prev, volume: notification.data.speaker.level}));
                 }
-                if (notification.type === 'PROGRESS_INFORMATION') {
+                if (notification?.type === 'PROGRESS_INFORMATION') {
                     const apiTrack = notification.data.track;
                     let track: Track | null = null;
                     if (apiTrack && apiTrack.title) {
-                        track = {
-                            id: apiTrack.id ?? playbackState.track?.id ?? '',
+                         track = {
+                            id: apiTrack.id ?? playbackState.track?.id ?? '', // Keep old ID if new one isn't provided
                             title: apiTrack.title,
                             artist: apiTrack.artist ?? 'Unknown Artist',
                             albumArtUrl: apiTrack.art?.url || 'https://placehold.co/300x300.png',
                             duration: apiTrack.duration ?? 0,
-                            path: apiTrack.path ?? '',
                         };
                     }
 
                     setPlaybackState(prev => ({
                         ...prev, 
-                        progress: notification.data.progress,
-                        state: notification.data.state as PlayState,
+                        progress: notification.data.progress ?? prev.progress,
+                        state: (notification.data.state as PlayState) ?? prev.state,
                         track: track, // Update track directly from notification
                     }));
                 }
-                if (notification.type === 'SOURCE') {
+                if (notification?.type === 'SOURCE' && notification.data?.primarySource?.id) {
                     setPlaybackState(prev => ({...prev, source: notification.data.primarySource.id}));
                 }
-                if (notification.type === 'PLAY_STATE') {
-                    setPlaybackState(prev => ({
-                        ...prev,
-                        state: notification.data.state as PlayState,
-                        playMode: notification.data.playQueue.shuffle ? 'shuffle' : 'sequential', // This might need adjustment
-                    }));
+                if (notification?.type === 'PLAY_STATE') {
+                    if (notification.data?.state) {
+                        setPlaybackState(prev => ({...prev, state: notification.data.state as PlayState}));
+                    }
+                    if (notification.data?.playQueue?.shuffle !== undefined) {
+                        const newPlayMode = notification.data.playQueue.shuffle ? 'shuffle' : 'sequential';
+                        setPlaybackState(prev => ({...prev, playMode: newPlayMode}));
+                    }
                 }
 
             } catch (error) {
@@ -295,6 +283,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
 
 
   const handleSelectDevice = (deviceId: string) => {
+    if (selectedDeviceId === deviceId) return;
     setSelectedDeviceId(deviceId);
     // Reset state for the new device, will be populated by effects
     setPlaybackState({
@@ -307,11 +296,11 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     if (!selectedDevice?.online) return;
     const newState = playbackState.state === 'playing' ? 'paused' : 'playing';
     try {
+        setPlaybackState(prev => ({...prev, state: newState})); // Optimistic update
         await setDevicePlaybackState(selectedDevice.id, selectedDevice.ip, newState);
-        // The state will be updated by the notification listener, but we can do an optimistic update for responsiveness
-        setPlaybackState(prev => ({...prev, state: newState}));
     } catch (error) {
         toast({ variant: "destructive", title: "Failed to toggle play state" });
+        setPlaybackState(prev => ({...prev, state: playbackState.state})); // Revert on failure
     }
   };
 
@@ -336,7 +325,8 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
   const handleSeek = async (value: number[]) => {
     if (!selectedDevice?.online || !playbackState.track) return;
     const newProgress = value[0];
-    setPlaybackState(prev => ({ ...prev, progress: newProgress })); // Optimistic update
+    // We update the UI optimistically for smoothness
+    setPlaybackState(prev => ({ ...prev, progress: newProgress })); 
     try {
         await seekTo(selectedDevice.id, selectedDevice.ip, newProgress);
     } catch (error) {
@@ -357,20 +347,20 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
   }
 
   const handleSourceChange = async (source: string) => {
-    if (!selectedDevice) return;
+    if (!selectedDevice?.online) return;
     try {
-        await changeSource(selectedDevice.id, selectedDevice.ip, source);
         setPlaybackState(prev => ({ ...prev, source, track: null, progress: 0 })); // Optimistic update & reset track
+        await changeSource(selectedDevice.id, selectedDevice.ip, source);
     } catch (error) {
         toast({ variant: "destructive", title: "Failed to change source" });
     }
   }
 
   const handlePlayModeChange = async (mode: PlayMode) => {
-    if (!selectedDevice) return;
+    if (!selectedDevice?.online) return;
     try {
-        await setDevicePlayMode(selectedDevice.id, selectedDevice.ip, mode);
         setPlaybackState(prev => ({ ...prev, playMode: mode })); // Optimistic update
+        await setDevicePlayMode(selectedDevice.id, selectedDevice.ip, mode);
         toast({
             title: "Playback Mode Changed",
             description: `Mode set to ${mode.replace('-', ' ')}.`,
@@ -476,7 +466,11 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
 
   const handleAddDevice = async (device: NewDevice) => {
     const newDevice = await addDevice(device);
-    setDevices(prev => [...prev, newDevice]);
+    setDevices(prev => {
+        // Avoid adding duplicates
+        if (prev.some(d => d.id === newDevice.id)) return prev;
+        return [...prev, newDevice];
+    });
     setSelectedDeviceId(newDevice.id);
     toast({
         title: "Device Added",

@@ -1,3 +1,4 @@
+
 "use client"
 
 import {
@@ -17,13 +18,13 @@ import {
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Search } from "lucide-react";
-import type { Track } from "@/lib/types";
+import { Search } from "lucide-react";
 import { useState } from "react";
 import Image from "next/image";
 import { useAppContext } from "./AcousticHarmonyApp";
 
 function formatTime(seconds: number) {
+    if (isNaN(seconds) || seconds <= 0) return '0:00';
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
@@ -63,8 +64,7 @@ export function MusicLibrary() {
                             <TableHead className="w-[80px]">Artwork</TableHead>
                             <TableHead>Title</TableHead>
                             <TableHead>Artist</TableHead>
-                            <TableHead>Duration</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
+                            <TableHead className="text-right">Duration</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -82,20 +82,19 @@ export function MusicLibrary() {
                                 </TableCell>
                                 <TableCell className="font-medium">{track.title}</TableCell>
                                 <TableCell>{track.artist}</TableCell>
-                                <TableCell>{formatTime(track.duration)}</TableCell>
-                                <TableCell className="text-right">
-                                    <Button variant="ghost" size="icon">
-                                        <PlusCircle className="h-4 w-4" />
-                                        <span className="sr-only">Add to playlist</span>
-                                    </Button>
-                                </TableCell>
+                                <TableCell className="text-right">{formatTime(track.duration)}</TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
                 </Table>
-                {filteredTracks.length === 0 && (
+                {tracks.length > 0 && filteredTracks.length === 0 && (
                     <div className="text-center text-muted-foreground py-8">
-                        No tracks found{searchTerm ? ' for your search' : ''}.
+                        No tracks found for your search.
+                    </div>
+                )}
+                 {tracks.length === 0 && (
+                    <div className="text-center text-muted-foreground py-8">
+                        No tracks in the library. Go to Settings to scan your music folders.
                     </div>
                 )}
             </CardContent>
