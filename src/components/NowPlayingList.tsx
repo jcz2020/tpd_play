@@ -12,7 +12,7 @@ import { Music } from "lucide-react";
 
 export function NowPlayingList() {
     const { state, actions } = useAppContext();
-    const { nowPlaying, track, playlists, selectedPlaylistId, playbackState } = state;
+    const { nowPlaying, playlists, selectedPlaylistId, playbackState } = state;
     const { handleSelectPlaylist, handleSelectTrack } = actions;
 
     const isLocalSource = playbackState.source === 'local';
@@ -62,7 +62,7 @@ export function NowPlayingList() {
                                 key={t.id} 
                                 className={cn(
                                     "flex items-center gap-4 p-2 rounded-md cursor-pointer hover:bg-muted",
-                                    t.id === track?.id && "bg-primary/20 hover:bg-primary/30"
+                                    t.id === playbackState.track?.id && "bg-primary/20 hover:bg-primary/30"
                                 )}
                                 onClick={() => handleSelectTrack(t.id)}
                             >
@@ -75,7 +75,7 @@ export function NowPlayingList() {
                                     unoptimized
                                 />
                                 <div className="flex-1 truncate">
-                                    <p className={cn("font-medium", t.id === track?.id && "text-primary-foreground")}>{t.title}</p>
+                                    <p className={cn("font-medium", t.id === playbackState.track?.id && "text-primary-foreground")}>{t.title}</p>
                                     <p className="text-sm text-muted-foreground">{t.artist}</p>
                                 </div>
                             </div>

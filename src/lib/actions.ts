@@ -1,7 +1,7 @@
 
 "use server";
 
-import type { Device, NewDevice, PlaybackState, Source } from "./types";
+import type { Device, NewDevice, PlaybackState, PlayMode, Source, Track } from "./types";
 import { getDb, saveDb } from "./db";
 import { randomUUID } from "crypto";
 
@@ -10,45 +10,56 @@ import { randomUUID } from "crypto";
 const beoApi = {
     get: async (ip: string, path: string) => {
       // In a real app, you'd add error handling, headers, etc.
-      const response = await fetch(`http://${ip}/${path}`, { cache: 'no-store' });
-      if (!response.ok) {
-        // A real app would have more robust error handling
-        console.error(`API GET request to http://${ip}/${path} failed with status ${response.status}`);
-        // Return an empty object on failure to prevent crashes
-        return {}; 
-      }
+      const url = `http://${ip}:8080/${path}`;
       try {
+        const response = await fetch(url, { cache: 'no-store' });
+        if (!response.ok) {
+          console.error(`API GET request to ${url} failed with status ${response.status}`);
+          return {}; 
+        }
         const data = await response.json();
         return data;
       } catch (e) {
-        console.error(`Failed to parse JSON from http://${ip}/${path}`);
+        console.error(`API GET request to ${url} failed:`, e);
         return {};
       }
     },
     post: async (ip: string, path: string, body: any = {}) => {
-      const response = await fetch(`http://${ip}/${path}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        cache: 'no-store',
-      });
-      if (!response.ok) {
-        console.error(`API POST request to http://${ip}/${path} failed with status ${response.status}`);
+      const url = `http://${ip}:8080/${path}`;
+      try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            cache: 'no-store',
+          });
+          if (!response.ok) {
+            console.error(`API POST request to ${url} failed with status ${response.status}`);
+          }
+          return response;
+      } catch (e) {
+        console.error(`API POST request to ${url} failed:`, e);
+        return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500 });
       }
-      return response;
     },
     put: async (ip: string, path: string, body: any = {}) => {
-        const response = await fetch(`http://${ip}/${path}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-          cache: 'no-store',
-        });
-        if (!response.ok) {
-          console.error(`API PUT request to http://${ip}/${path} failed with status ${response.status}`);
+        const url = `http://${ip}:8080/${path}`;
+        try {
+            const response = await fetch(url, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+                cache: 'no-store',
+            });
+            if (!response.ok) {
+                console.error(`API PUT request to ${url} failed with status ${response.status}`);
+            }
+            return response;
+        } catch (e) {
+            console.error(`API PUT request to ${url} failed:`, e);
+            return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500 });
         }
-        return response;
-      },
+    },
   };
 
 // --- Device Management ---
@@ -101,14 +112,12 @@ export async function getAvailableSources(deviceId: string, ip: string): Promise
     console.log(`Fetching available sources for device ${deviceId} at ${ip}...`);
     try {
         const data = await beoApi.get(ip, 'BeoZone/Zone/Sources');
-        // The real API returns a complex object. We need to map it to our Source type.
-        // This is a simplified mapping based on potential B&O API structure.
         if (!data || !data.sources) {
             console.warn(`No sources data received from ${ip}`);
             return [];
         }
         return Object.entries(data.sources).map(([id, source]: [string, any]) => ({
-            id: source.id,
+            id: source.id ?? id,
             name: source.friendlyName,
             type: source.type,
         }));
@@ -131,23 +140,25 @@ export async function getPlaybackState(deviceId: string, ip: string): Promise<Pl
         throw new Error("Failed to get any valid data from device.");
       }
       
-      // The track object from the API
       const apiTrack = streamData.track;
-
+      let track: Track | null = null;
+      if (apiTrack && apiTrack.title) {
+        track = {
+            id: apiTrack.id ?? randomUUID(),
+            title: apiTrack.title,
+            artist: apiTrack.artist ?? 'Unknown Artist',
+            albumArtUrl: apiTrack.art?.url || 'https://placehold.co/300x300.png',
+            duration: apiTrack.duration ?? 0,
+        };
+      }
+      
       return {
         state: streamData.state ?? "stopped",
         progress: streamData.progress ?? 0,
         volume: volumeData.level ?? 50,
         source: streamData.source?.id ?? "local",
-        playMode: streamData.playMode ?? 'sequential',
-        track: apiTrack ? { // Only create a track object if the API provides one
-            id: apiTrack.id ?? randomUUID(),
-            title: apiTrack.title ?? 'Unknown Title',
-            artist: apiTrack.artist ?? 'Unknown Artist',
-            // Use a placeholder only if the album art is missing from the real data
-            albumArtUrl: apiTrack.albumArtUrl || 'https://placehold.co/300x300.png',
-            duration: apiTrack.duration ?? 0,
-        } : null, // If there's no track from the API, we return null
+        playMode: streamData.playMode?.shuffle ? 'shuffle' : 'sequential',
+        track: track,
       };
     } catch (error) {
       console.error(`Failed to get playback state for ${ip}:`, error);
@@ -188,7 +199,7 @@ export async function changeSource(deviceId: string, ip: string, sourceId: strin
     await beoApi.post(ip, 'BeoZone/Zone/ActiveSource', { id: sourceId });
 }
 
-export async function setPlayMode(deviceId: string, ip: string, mode: string): Promise<void> {
-    // The real B&O API might have a different path and payload for this
-    await beoApi.put(ip, 'BeoZone/Zone/Player/playMode', { mode });
+export async function setPlayMode(deviceId: string, ip: string, mode: PlayMode): Promise<void> {
+    const shuffle = mode === 'shuffle';
+    await beoApi.put(ip, 'BeoZone/Zone/Player/playQueue', { shuffle });
 }

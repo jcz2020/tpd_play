@@ -32,8 +32,9 @@ const sourceIcons: { [key: string]: React.ElementType } = {
 
 export function PlaybackControls() {
   const { state, actions } = useAppContext();
-  const { track, playbackState, availableSources } = state;
+  const { playbackState, availableSources } = state;
   const { handleTogglePlay, handleSeek, handleVolumeChange, handleSourceChange, handlePlayModeChange, handleNextTrack, handlePrevTrack } = actions;
+  const { track } = playbackState;
   
   const device = state.devices.find(d => d.id === state.selectedDeviceId);
 

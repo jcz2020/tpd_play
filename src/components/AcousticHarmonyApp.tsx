@@ -34,7 +34,6 @@ export interface AppState {
     devices: Device[];
     selectedDeviceId: string | null;
     schedules: Schedule[];
-    track: Track | null;
     playlists: PlaylistType[];
     nowPlaying: Track[];
     selectedPlaylistId: string | null;
@@ -81,7 +80,6 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
   const [devices, setDevices] = React.useState<Device[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = React.useState<string | null>(null);
   const [schedules, setSchedules] = React.useState<Schedule[]>([]);
-  const [track, setTrack] = React.useState<Track | null>(null);
   const [playlists, setPlaylists] = React.useState<PlaylistType[]>([]);
   const [nowPlaying, setNowPlaying] = React.useState<Track[]>([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = React.useState<string | null>(null);
@@ -172,7 +170,6 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
         // Get the full initial state first
         const initialState = await getPlaybackState(selectedDevice.id, selectedDevice.ip);
         setPlaybackState(initialState);
-        setTrack(initialState.track);
 
         // Then fetch available sources
         const sources = await getAvailableSources(selectedDevice.id, selectedDevice.ip);
@@ -192,7 +189,6 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
         setPlaybackState({
             state: "stopped", progress: 0, volume: 50, source: 'local', playMode: 'sequential', track: null
         });
-        setTrack(null);
       }
     };
     
@@ -233,10 +229,8 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
                         ...prev, 
                         progress: notification.data.progress,
                         state: notification.data.state as PlayState,
+                        track: notification.data.track, // Update track directly from notification
                     }));
-                    if (notification.data.track) {
-                        setTrack(notification.data.track);
-                    }
                 }
                 if (notification.type === 'SOURCE') {
                     setPlaybackState(prev => ({...prev, source: notification.data.primarySource.id}));
@@ -245,7 +239,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
                     setPlaybackState(prev => ({
                         ...prev,
                         state: notification.data.state as PlayState,
-                        playMode: notification.data.playQueue.shuffle, // This might need adjustment based on real API data
+                        playMode: notification.data.playQueue.shuffle ? 'shuffle' : 'sequential', // This might need adjustment
                     }));
                 }
 
@@ -275,7 +269,6 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     setPlaybackState({
         state: "stopped", progress: 0, volume: 50, source: 'local', playMode: 'sequential', track: null,
     });
-    setTrack(null);
     setAvailableSources([]);
   };
 
@@ -310,7 +303,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
   }
 
   const handleSeek = async (value: number[]) => {
-    if (!selectedDevice?.online || !track) return;
+    if (!selectedDevice?.online || !playbackState.track) return;
     const newProgress = value[0];
     setPlaybackState(prev => ({ ...prev, progress: newProgress })); // Optimistic update
     try {
@@ -336,7 +329,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     if (!selectedDevice) return;
     try {
         await changeSource(selectedDevice.id, selectedDevice.ip, source);
-        setPlaybackState(prev => ({ ...prev, source })); // Optimistic update
+        setPlaybackState(prev => ({ ...prev, source, track: null, progress: 0 })); // Optimistic update & reset track
     } catch (error) {
         toast({ variant: "destructive", title: "Failed to change source" });
     }
@@ -365,10 +358,10 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
         ).filter((t): t is Track => !!t);
         setNowPlaying(tracksInPlaylist);
         if (tracksInPlaylist.length > 0) {
-            setTrack(tracksInPlaylist[0]);
             // In a real app, you would now tell the device to play this playlist
+            setPlaybackState(prev => ({...prev, track: tracksInPlaylist[0]}));
         } else {
-            setTrack(null);
+            setPlaybackState(prev => ({...prev, track: null}));
         }
         if (!silent) {
             toast({ title: `Playlist "${playlist.name}" selected` });
@@ -381,8 +374,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     const selectedTrack = nowPlaying.find(t => t.id === trackId);
     if (selectedTrack) {
         // Here you would tell the device to play this specific track from the current queue
-        setTrack(selectedTrack);
-        setPlaybackState(p => ({...p, state: 'playing', progress: 0}));
+        setPlaybackState(p => ({...p, track: selectedTrack, state: 'playing', progress: 0}));
     }
   }
 
@@ -434,7 +426,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
       if (selectedPlaylistId === playlistId) {
         setSelectedPlaylistId(null);
         setNowPlaying([]);
-        setTrack(null);
+        setPlaybackState(prev => ({...prev, track: null}));
       }
       toast({
           title: "Playlist Deleted",
@@ -496,7 +488,6 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     devices,
     selectedDeviceId,
     schedules,
-    track,
     playlists,
     nowPlaying,
     selectedPlaylistId,
