@@ -44,6 +44,7 @@ export function AddDeviceDialog({ children }: { children: React.ReactNode }) {
     const { toast } = useToast();
     const [open, setOpen] = React.useState(false);
     const [isScanning, setIsScanning] = React.useState(false);
+    const [scanError, setScanError] = React.useState<string | null>(null);
     const [discoveredDevices, setDiscoveredDevices] = React.useState<Device[]>([]);
 
     const form = useForm<ManualAddFormValues>({
@@ -56,16 +57,16 @@ export function AddDeviceDialog({ children }: { children: React.ReactNode }) {
 
     const handleScan = async () => {
         setIsScanning(true);
+        setScanError(null);
         setDiscoveredDevices([]);
         try {
             const foundDevices = await actions.handleDiscoverDevices();
+            if (foundDevices.length === 0) {
+                setScanError("No devices found. Ensure the local discovery service is running and your devices are on the same network.");
+            }
             setDiscoveredDevices(foundDevices);
         } catch (error) {
-            toast({
-                variant: "destructive",
-                title: "Scan Failed",
-                description: "Could not scan the network for devices.",
-            });
+            setScanError("Failed to connect to the local discovery service. Please ensure it's running and accessible.");
         } finally {
             setIsScanning(false);
         }
@@ -88,6 +89,7 @@ export function AddDeviceDialog({ children }: { children: React.ReactNode }) {
             // Reset state when closing
             setIsScanning(false);
             setDiscoveredDevices([]);
+            setScanError(null);
             form.reset();
         }
     }
@@ -122,8 +124,8 @@ export function AddDeviceDialog({ children }: { children: React.ReactNode }) {
                                 )}
                                 {!isScanning && discoveredDevices.length === 0 && (
                                     <div className="flex justify-center items-center h-full text-center">
-                                        <p className="text-muted-foreground">
-                                            No devices found yet. Click "Scan Network" to begin.
+                                        <p className="text-sm text-muted-foreground p-4">
+                                            {scanError ? scanError : 'Click "Scan Network" to search for devices. This requires a local discovery service to be running on your computer.'}
                                         </p>
                                     </div>
                                 )}

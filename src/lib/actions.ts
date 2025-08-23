@@ -3,16 +3,26 @@
 
 import type { Device, Source } from "./types";
 
-// This is a placeholder function. In a real application, this functionality
-// would need to be implemented by a local backend service that can scan the
-// network for DLNA/UPnP devices and then expose that to the frontend.
-// A web browser or a cloud-hosted server cannot directly scan a user's local network.
+// This function now attempts to connect to a local backend service
+// that is responsible for scanning the local network for devices.
 export async function discoverDevices(): Promise<Device[]> {
-  console.log("Attempting to scan for B&O devices...");
-  // In a real implementation, you would have logic here to talk to a local service.
-  // For now, we return an empty array as we can't perform a real scan.
-  console.log("No local discovery service found. Returning empty list.");
-  return [];
+  console.log("Attempting to scan for B&O devices via local discovery service...");
+  try {
+    // This endpoint should be provided by a local helper service/backend
+    // running on the user's machine.
+    const response = await fetch('http://localhost:9003/discover', { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error(`Local discovery service responded with status: ${response.status}`);
+    }
+    const devices = await response.json();
+    console.log(`Discovered ${devices.length} devices.`);
+    return devices;
+  } catch (error) {
+    console.error("Could not connect to or parse response from the local discovery service:", error);
+    // Return an empty array or re-throw to be handled by the caller.
+    // Returning empty array to allow the UI to show a "not found" message.
+    return [];
+  }
 }
 
 
