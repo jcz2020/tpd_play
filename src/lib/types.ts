@@ -1,4 +1,5 @@
 
+
 export interface NewDevice {
   name: string;
   ip: string;
@@ -15,6 +16,7 @@ export interface Track {
   artist: string;
   albumArtUrl: string;
   duration: number; // in seconds
+  path: string; //
 }
 
 export type ScheduleAction = 'on' | 'off';

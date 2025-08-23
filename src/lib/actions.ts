@@ -1,9 +1,12 @@
 
 "use server";
 
-import type { Device, NewDevice, PlaybackState, PlayMode, Source, Track } from "./types";
+import type { Device, NewDevice, PlaybackState, PlayMode, Source, Track, MusicFolder } from "./types";
 import { getDb, saveDb } from "./db";
 import { randomUUID } from "crypto";
+import { promises as fs } from 'fs';
+import path from 'path';
+import * as mm from 'music-metadata';
 
 // This is a mock API client. In a real application, this would be a proper
 // library for interacting with the B&O API.
@@ -137,10 +140,14 @@ export async function getPlaybackState(deviceId: string, ip: string): Promise<Pl
 
       // Check for empty or invalid responses
       if (Object.keys(streamData).length === 0 && Object.keys(volumeData).length === 0) {
-        throw new Error("Failed to get any valid data from device.");
+        console.warn(`No valid data from device ${ip}. It might be offline or in standby.`);
+        // Return a sensible default "offline" or "error" state
+        return {
+            state: "stopped", progress: 0, volume: 50, source: 'local', playMode: 'sequential', track: null,
+        };
       }
       
-      const apiTrack = streamData.track;
+      const apiTrack = streamData?.track;
       let track: Track | null = null;
       if (apiTrack && apiTrack.title) {
         track = {
@@ -149,6 +156,7 @@ export async function getPlaybackState(deviceId: string, ip: string): Promise<Pl
             artist: apiTrack.artist ?? 'Unknown Artist',
             albumArtUrl: apiTrack.art?.url || 'https://placehold.co/300x300.png',
             duration: apiTrack.duration ?? 0,
+            path: apiTrack.path ?? '',
         };
       }
       
@@ -202,4 +210,73 @@ export async function changeSource(deviceId: string, ip: string, sourceId: strin
 export async function setPlayMode(deviceId: string, ip: string, mode: PlayMode): Promise<void> {
     const shuffle = mode === 'shuffle';
     await beoApi.put(ip, 'BeoZone/Zone/Player/playQueue', { shuffle });
+}
+
+
+// --- Music Library Management ---
+export async function getMusicFolders(): Promise<MusicFolder[]> {
+    const db = await getDb();
+    return db.musicFolders ?? [];
+}
+
+export async function saveMusicFolders(folders: MusicFolder[]): Promise<void> {
+    const db = await getDb();
+    db.musicFolders = folders;
+    await saveDb(db);
+}
+
+export async function getAvailableTracks(): Promise<Track[]> {
+    const db = await getDb();
+    return db.tracks ?? [];
+}
+
+export async function scanMusicFolders(): Promise<{ success: boolean, message: string, count: number }> {
+    console.log("Starting music folder scan...");
+    const db = await getDb();
+    const folders = db.musicFolders;
+
+    if (!folders || folders.length === 0) {
+        return { success: false, message: "No music folders configured.", count: 0 };
+    }
+
+    const supportedExtensions = ['.mp3', '.flac', '.wav', '.ogg', '.m4a'];
+    let allTracks: Track[] = [];
+
+    for (const folder of folders) {
+        try {
+            console.log(`Scanning folder: ${folder.path}`);
+            const files = await fs.readdir(folder.path, { recursive: true });
+            for (const file of files) {
+                const filePath = path.join(folder.path, file as string);
+                if (supportedExtensions.includes(path.extname(filePath).toLowerCase())) {
+                    try {
+                        const stats = await fs.stat(filePath);
+                        if (stats.isFile()) {
+                           const metadata = await mm.parseFile(filePath);
+                           const track: Track = {
+                                id: randomUUID(),
+                                title: metadata.common.title ?? path.basename(filePath),
+                                artist: metadata.common.artist ?? 'Unknown Artist',
+                                albumArtUrl: 'https://placehold.co/100x100.png', // Placeholder, could be extracted if available
+                                duration: metadata.format.duration ?? 0,
+                                path: filePath,
+                           };
+                           allTracks.push(track);
+                        }
+                    } catch (err) {
+                        console.warn(`Could not parse metadata for ${filePath}:`, err);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error(`Error scanning folder ${folder.path}:`, error);
+            return { success: false, message: `Error scanning folder: ${folder.path}. Please check if the path is correct and accessible.`, count: 0 };
+        }
+    }
+
+    db.tracks = allTracks;
+    await saveDb(db);
+
+    console.log(`Scan complete. Found ${allTracks.length} tracks.`);
+    return { success: true, message: `Scan complete. Found ${allTracks.length} tracks.`, count: allTracks.length };
 }

@@ -28,6 +28,10 @@ import {
     previousTrack,
     setPlayMode as setDevicePlayMode,
     changeSource,
+    getMusicFolders,
+    saveMusicFolders,
+    getAvailableTracks,
+    scanMusicFolders as scanDeviceMusicFolders
 } from "@/lib/actions";
 
 export interface AppState {
@@ -63,6 +67,7 @@ export type AppActions = {
     handlePlayModeChange: (mode: PlayMode) => void;
     handleSelectPlaylist: (playlistId: string) => void;
     handleSelectTrack: (trackId: string) => void;
+    handleScanMusicFolders: () => Promise<{ success: boolean, message: string, count: number }>;
 };
 
 
@@ -103,8 +108,20 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
   // Initial data loading
   React.useEffect(() => {
     const loadInitialData = async () => {
-        const initialDevices = await getDevices();
+        const [
+            initialDevices, 
+            initialMusicFolders,
+            initialTracks,
+        ] = await Promise.all([
+            getDevices(),
+            getMusicFolders(),
+            getAvailableTracks(),
+        ]);
+        
         setDevices(initialDevices);
+        setMusicFolders(initialMusicFolders);
+        setAvailableTracks(initialTracks);
+
         if (initialDevices.length > 0) {
             const savedState = localStorage.getItem('acousticHarmonyState');
             let deviceToSelect = initialDevices[0].id;
@@ -225,11 +242,24 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
                     setPlaybackState(prev => ({...prev, volume: notification.data.speaker.level}));
                 }
                 if (notification.type === 'PROGRESS_INFORMATION') {
+                    const apiTrack = notification.data.track;
+                    let track: Track | null = null;
+                    if (apiTrack && apiTrack.title) {
+                        track = {
+                            id: apiTrack.id ?? randomUUID(),
+                            title: apiTrack.title,
+                            artist: apiTrack.artist ?? 'Unknown Artist',
+                            albumArtUrl: apiTrack.art?.url || 'https://placehold.co/300x300.png',
+                            duration: apiTrack.duration ?? 0,
+                            path: apiTrack.path ?? '',
+                        };
+                    }
+
                     setPlaybackState(prev => ({
                         ...prev, 
                         progress: notification.data.progress,
                         state: notification.data.state as PlayState,
-                        track: notification.data.track, // Update track directly from notification
+                        track: track, // Update track directly from notification
                     }));
                 }
                 if (notification.type === 'SOURCE') {
@@ -434,7 +464,8 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
       });
   };
   
-  const handleMusicFoldersChange = (folders: MusicFolder[]) => {
+  const handleMusicFoldersChange = async (folders: MusicFolder[]) => {
+    await saveMusicFolders(folders);
     setMusicFolders(folders);
     toast({
         title: "Music Folders Updated",
@@ -482,6 +513,16 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
 
   const handleDiscoverDevices = async () => {
     return await discoverDevices();
+  };
+
+  const handleScanMusicFolders = async () => {
+    const result = await scanDeviceMusicFolders();
+    if (result.success) {
+        // Re-fetch tracks to update the UI
+        const tracks = await getAvailableTracks();
+        setAvailableTracks(tracks);
+    }
+    return result;
   }
 
   const state: AppState = {
@@ -517,6 +558,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     handlePlayModeChange,
     handleSelectPlaylist,
     handleSelectTrack,
+    handleScanMusicFolders,
   };
 
   return (
