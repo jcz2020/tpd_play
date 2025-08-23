@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import type { Device, MusicFolder } from "@/lib/types";
+import type { MusicFolder } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "./ui/separator";
 import * as React from "react";
@@ -13,9 +13,8 @@ import { useAppContext } from "./AcousticHarmonyApp";
 
 export function Settings() {
     const { state, actions } = useAppContext();
-    const { musicFolders, devices, selectedDeviceId } = state;
+    const { musicFolders } = state;
     const { handleMusicFoldersChange } = actions;
-    const device = devices.find(d => d.id === selectedDeviceId);
 
     const { toast } = useToast();
     const [isScanning, setIsScanning] = React.useState(false);
@@ -73,7 +72,7 @@ export function Settings() {
                         <div className="flex items-center justify-between">
                             <h3 className="font-medium text-foreground">Music Library</h3>
                             <Button onClick={handleScan} disabled={isScanning} variant="outline" size="sm">
-                                {isScanning ? <Loader2 className="animate-spin mr-2" /> : <FolderSync className="mr-2" />}
+                                {isScanning ? <Loader2 className="animate-spin mr-2" /> : <FolderSync className="mr-2 h-4 w-4" />}
                                 Scan All
                             </Button>
                         </div>
@@ -102,21 +101,7 @@ export function Settings() {
                     </div>
 
                     <Separator />
-
-                    {device ? (
-                        <div className="space-y-4">
-                            <h3 className="font-medium text-foreground">Device: {device.name}</h3>
-                            <div className="space-y-2">
-                                <Label htmlFor="device-ip">Device IP Address</Label>
-                                <Input id="device-ip" defaultValue={device.ip} disabled />
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="text-center text-muted-foreground py-4">
-                            Select a device to see its settings.
-                        </div>
-                    )}
-
+                    
                     <Button type="submit" className="w-full">Save Settings</Button>
                 </CardContent>
             </form>
