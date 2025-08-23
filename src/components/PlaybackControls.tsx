@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Pause, Play, Rewind, FastForward, Volume2, VolumeX, Music, Disc, Bluetooth, AudioLines, Library } from "lucide-react";
+import { Pause, Play, Rewind, FastForward, Volume2, VolumeX, Music, Disc, Bluetooth, AudioLines, Library, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "./AcousticHarmonyApp";
 import { Separator } from "./ui/separator";
@@ -25,23 +25,14 @@ const sourceIcons: { [key: string]: React.ElementType } = {
     spotify: Disc,
     tidal: Disc,
     deezer: Disc,
+    dlna: Radio,
     bluetooth: Bluetooth,
     "line-in": AudioLines
 }
 
-const sourceLabels: { [key: string]: string } = {
-    local: "Local Library",
-    spotify: "Spotify",
-    tidal: "Tidal",
-    deezer: "Deezer",
-    bluetooth: "Bluetooth",
-    "line-in": "Line-in"
-}
-
-
 export function PlaybackControls() {
   const { state, actions } = useAppContext();
-  const { track, playbackState } = state;
+  const { track, playbackState, availableSources } = state;
   const { handleTogglePlay: onTogglePlay, handleProgressChange: onProgressChange, handleVolumeChange: onVolumeChange, handleSourceChange } = actions;
   
   const device = state.devices.find(d => d.id === state.selectedDeviceId);
@@ -70,7 +61,7 @@ export function PlaybackControls() {
   const trackDuration = isLocalSource ? (track?.duration ?? 0) : 0;
   const currentProgress = isLocalSource ? Math.min(playbackState.progress, trackDuration) : 0;
   
-  const SourceIcon = sourceIcons[playbackState.source] || Music;
+  const CurrentSourceIcon = sourceIcons[playbackState.source] || Music;
 
   return (
     <Card className={cn(!isDeviceOnline && "bg-muted/50")}>
@@ -106,21 +97,21 @@ export function PlaybackControls() {
         <div className="w-full max-w-xs space-y-4">
             <div className="space-y-2">
                 <Label>Source</Label>
-                <Select value={playbackState.source} onValueChange={handleSourceChange} disabled={!isDeviceOnline}>
+                <Select value={playbackState.source} onValueChange={handleSourceChange} disabled={!isDeviceOnline || availableSources.length === 0}>
                     <SelectTrigger>
                         <div className="flex items-center gap-2">
-                            <SourceIcon className="h-4 w-4" />
-                            <SelectValue />
+                            <CurrentSourceIcon className="h-4 w-4" />
+                            <SelectValue placeholder="Select a source" />
                         </div>
                     </SelectTrigger>
                     <SelectContent>
-                        {Object.entries(sourceLabels).map(([key, label]) => {
-                           const Icon = sourceIcons[key];
+                        {availableSources.map((source) => {
+                           const Icon = sourceIcons[source.type] || Music;
                            return(
-                            <SelectItem key={key} value={key}>
+                            <SelectItem key={source.id} value={source.id}>
                                  <div className="flex items-center gap-2">
                                     <Icon className="h-4 w-4" />
-                                    <span>{label}</span>
+                                    <span>{source.name}</span>
                                  </div>
                             </SelectItem>
                            )

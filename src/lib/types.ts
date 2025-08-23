@@ -1,3 +1,4 @@
+
 export interface Device {
   id: string;
   name: string;
@@ -34,6 +35,13 @@ export interface MusicFolder {
   id: string;
   path: string;
 }
+
+export interface Source {
+  id: string;
+  name: string;
+  type: string; // e.g., 'spotify', 'line-in', 'dlna'
+}
+
 
 export interface PlaybackState {
     isPlaying: boolean;

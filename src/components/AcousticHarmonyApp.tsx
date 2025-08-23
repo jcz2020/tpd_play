@@ -9,12 +9,12 @@ import {
   SidebarInset,
 } from "@/components/ui/sidebar";
 import { DeviceList } from "@/components/DeviceList";
-import type { Device, Schedule, Track, Playlist as PlaylistType, MusicFolder, PlaybackState } from "@/lib/types";
+import type { Device, Schedule, Track, Playlist as PlaylistType, MusicFolder, PlaybackState, Source } from "@/lib/types";
 import { Speaker } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AppHeader } from "./AppHeader";
 import { AppNavigation } from "./AppNavigation";
-import { discoverDevices } from "@/lib/actions";
+import { discoverDevices, getAvailableSources } from "@/lib/actions";
 
 const MOCK_DEVICES: Device[] = [
     { id: '1', name: 'Living Room Speaker', ip: '192.168.1.100', online: true },
@@ -38,6 +38,7 @@ export interface AppState {
     track: Track | null;
     playlists: PlaylistType[];
     availableTracks: Track[];
+    availableSources: Source[];
     musicFolders: MusicFolder[];
     playbackState: PlaybackState;
 }
@@ -77,6 +78,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
   const [track, setTrack] = React.useState<Track | null>(MOCK_TRACKS[0]);
   const [playlists, setPlaylists] = React.useState<PlaylistType[]>([]);
   const [availableTracks, setAvailableTracks] = React.useState<Track[]>(MOCK_TRACKS);
+  const [availableSources, setAvailableSources] = React.useState<Source[]>([]);
   const [musicFolders, setMusicFolders] = React.useState<MusicFolder[]>([ { id: '1', path: '/Users/me/Music' } ]);
   const [playbackState, setPlaybackState] = React.useState<PlaybackState>({
     isPlaying: false,
@@ -88,6 +90,29 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
   const { toast } = useToast();
 
   const selectedDevice = devices.find(d => d.id === selectedDeviceId);
+
+  React.useEffect(() => {
+    if (!selectedDevice || !selectedDevice.online) {
+      setAvailableSources([]);
+      return;
+    }
+
+    const fetchSources = async () => {
+      try {
+        const sources = await getAvailableSources(selectedDevice.id, selectedDevice.ip);
+        setAvailableSources(sources);
+        // If current source is not available on new device, switch to the first available one
+        if (!sources.find(s => s.id === playbackState.source)) {
+            handleSourceChange(sources[0]?.id ?? 'local');
+        }
+      } catch (error) {
+        toast({ variant: "destructive", title: "Failed to get sources" });
+        setAvailableSources([]);
+      }
+    };
+    fetchSources();
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, [selectedDeviceId, selectedDevice?.online]);
 
   React.useEffect(() => {
     if (!selectedDevice || !selectedDevice.online) {
@@ -197,17 +222,18 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
 
   const handleSourceChange = (source: string) => {
     setPlaybackState(prev => ({ ...prev, source }));
+    const sourceName = availableSources.find(s => s.id === source)?.name || source;
     toast({
         title: "Source Changed",
-        description: `Switched to ${source}.`,
+        description: `Switched to ${sourceName}.`,
     });
 
     if (source === 'local') {
         setTrack(MOCK_TRACKS[0]);
     } else {
         setTrack({
-            id: 'ext-1',
-            title: `Playing from ${source}`,
+            id: `ext-${source}`,
+            title: `Playing from ${sourceName}`,
             artist: 'External Source',
             albumArtUrl: 'https://placehold.co/300x300.png',
             duration: 0,
@@ -308,6 +334,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     track,
     playlists,
     availableTracks,
+    availableSources,
     musicFolders,
     playbackState,
   };

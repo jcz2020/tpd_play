@@ -1,7 +1,7 @@
 
 "use server";
 
-import type { Device } from "./types";
+import type { Device, Source } from "./types";
 
 // This is a mock function. In a real application, this would use a library 
 // like 'node-ssdp' or a custom implementation to scan the local network
@@ -39,4 +39,30 @@ export async function discoverDevices(): Promise<Device[]> {
   // In a real scenario, you would probably want to filter out devices
   // that are already added to the user's list.
   return mockDiscoveredDevices;
+}
+
+
+// This is a mock function. In a real application, this would make a GET request
+// to the device's IP address: `http://${ip}/BeoZone/Zone/Sources`
+export async function getAvailableSources(deviceId: string, ip: string): Promise<Source[]> {
+    console.log(`Fetching available sources for device ${deviceId} at ${ip}...`);
+
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Based on the device, we can return different mock sources.
+    // This simulates different devices having different capabilities.
+    const mockSources: Source[] = [
+        { id: "local", name: "Local Library", type: 'local'},
+        { id: "spotify", name: "Spotify", type: "spotify" },
+        { id: "line-in", name: "Line-In", type: "line-in" },
+        { id: "bluetooth", name: "Bluetooth", type: "bluetooth" },
+    ];
+
+    if (deviceId.includes('2') || deviceId === 'd-1') { // Mock BeoPlay A9 or Stage having more sources
+        mockSources.push({ id: "tidal", name: "Tidal", type: "tidal" });
+        mockSources.push({ id: "deezer", name: "Deezer", type: "deezer" });
+    }
+
+    console.log(`Found ${mockSources.length} sources for device ${deviceId}.`);
+    return mockSources;
 }
