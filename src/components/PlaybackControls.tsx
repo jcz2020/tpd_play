@@ -204,7 +204,7 @@ export function PlaybackControls() {
                         return (
                         <SelectItem key={source.id} value={source.id}>
                             <div className="flex items-center gap-2">
-                                <Icon className="h-4 w-4 text-muted-foreground" />
+                                <Icon key={source.id} className="h-4 w-4 text-muted-foreground" />
                                 <span>{source.name}</span>
                             </div>
                         </SelectItem>
