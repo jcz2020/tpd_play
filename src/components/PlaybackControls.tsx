@@ -215,7 +215,7 @@ export function PlaybackControls() {
                         const Icon = sourceIcons[source.type] || Music;
                         return (
                         <SelectItem key={source.id} value={source.id}>
-                            <div className="flex items-center gap-2" key={source.id}>
+                            <div className="flex items-center gap-2">
                                 <Icon className="h-4 w-4 text-muted-foreground" />
                                 <span>{source.name}</span>
                             </div>
