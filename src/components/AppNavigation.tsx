@@ -22,16 +22,16 @@ export function AppNavigation() {
             <SidebarMenu>
                 {NAV_ITEMS.map((item) => (
                     <SidebarMenuItem key={item.href}>
-                        <SidebarMenuButton
-                            asChild
-                            isActive={pathname.startsWith(item.href)}
-                            tooltip={{ children: item.label, side: 'right', align: 'center' }}
-                        >
-                            <Link href={item.href}>
+                        <Link href={item.href} passHref legacyBehavior>
+                            <SidebarMenuButton
+                                as="a"
+                                isActive={pathname.startsWith(item.href)}
+                                tooltip={{ children: item.label, side: 'right', align: 'center' }}
+                            >
                                 <item.icon />
                                 <span>{item.label}</span>
-                            </Link>
-                        </SidebarMenuButton>
+                            </SidebarMenuButton>
+                        </Link>
                     </SidebarMenuItem>
                 ))}
             </SidebarMenu>
