@@ -1,3 +1,4 @@
+
 "use client"
 
 import { usePathname } from "next/navigation";
@@ -21,13 +22,16 @@ export function AppNavigation() {
             <SidebarMenu>
                 {NAV_ITEMS.map((item) => (
                     <SidebarMenuItem key={item.href}>
-                        <Link href={item.href} passHref legacyBehavior>
+                        <Link href={item.href} passHref>
                             <SidebarMenuButton
+                                asChild
                                 isActive={pathname.startsWith(item.href)}
                                 tooltip={{ children: item.label, side: 'right', align: 'center' }}
                             >
+                                <div>
                                 <item.icon />
                                 <span>{item.label}</span>
+                                </div>
                             </SidebarMenuButton>
                         </Link>
                     </SidebarMenuItem>
