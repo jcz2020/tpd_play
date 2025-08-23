@@ -61,7 +61,8 @@ export function PlaybackControls() {
   const trackDuration = isLocalSource ? (track?.duration ?? 0) : 0;
   const currentProgress = isLocalSource ? Math.min(playbackState.progress, trackDuration) : 0;
   
-  const CurrentSourceIcon = sourceIcons[playbackState.source] || Music;
+  const sourceInfo = availableSources.find(s => s.id === playbackState.source)
+  const CurrentSourceIcon = sourceIcons[sourceInfo?.type ?? 'local'] || Music;
 
   return (
     <Card className={cn(!isDeviceOnline && "bg-muted/50")}>
@@ -106,13 +107,9 @@ export function PlaybackControls() {
                     </SelectTrigger>
                     <SelectContent>
                         {availableSources.map((source) => {
-                           const Icon = sourceIcons[source.type] || Music;
                            return(
                             <SelectItem key={source.id} value={source.id}>
-                                 <div className="flex items-center gap-2">
-                                    <Icon className="h-4 w-4" />
-                                    <span>{source.name}</span>
-                                 </div>
+                                <span>{source.name}</span>
                             </SelectItem>
                            )
                         })}
