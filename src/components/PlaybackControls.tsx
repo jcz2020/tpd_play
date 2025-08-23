@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -5,22 +6,43 @@ import Image from "next/image";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Pause, Play, Rewind, FastForward, Volume2, VolumeX, Music } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Pause, Play, Rewind, FastForward, Volume2, VolumeX, Music, Disc, Bluetooth, AudioLines, Library } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "./AcousticHarmonyApp";
 import { Separator } from "./ui/separator";
 import { Label } from "./ui/label";
 
 function formatTime(seconds: number) {
+  if (isNaN(seconds) || seconds < 0) return "0:00";
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = Math.floor(seconds % 60);
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
+const sourceIcons: { [key: string]: React.ElementType } = {
+    local: Library,
+    spotify: Disc,
+    tidal: Disc,
+    deezer: Disc,
+    bluetooth: Bluetooth,
+    "line-in": AudioLines
+}
+
+const sourceLabels: { [key: string]: string } = {
+    local: "Local Library",
+    spotify: "Spotify",
+    tidal: "Tidal",
+    deezer: "Deezer",
+    bluetooth: "Bluetooth",
+    "line-in": "Line-in"
+}
+
+
 export function PlaybackControls() {
   const { state, actions } = useAppContext();
   const { track, playbackState } = state;
-  const { handleTogglePlay: onTogglePlay, handleProgressChange: onProgressChange, handleVolumeChange: onVolumeChange } = actions;
+  const { handleTogglePlay: onTogglePlay, handleProgressChange: onProgressChange, handleVolumeChange: onVolumeChange, handleSourceChange } = actions;
   
   const device = state.devices.find(d => d.id === state.selectedDeviceId);
 
@@ -44,8 +66,11 @@ export function PlaybackControls() {
 
 
   const isDeviceOnline = !!device?.online;
-  const trackDuration = track?.duration ?? 0;
-  const currentProgress = Math.min(playbackState.progress, trackDuration);
+  const isLocalSource = playbackState.source === 'local';
+  const trackDuration = isLocalSource ? (track?.duration ?? 0) : 0;
+  const currentProgress = isLocalSource ? Math.min(playbackState.progress, trackDuration) : 0;
+  
+  const SourceIcon = sourceIcons[playbackState.source] || Music;
 
   return (
     <Card className={cn(!isDeviceOnline && "bg-muted/50")}>
@@ -60,7 +85,7 @@ export function PlaybackControls() {
             {track?.albumArtUrl ? (
                 <Image
                     src={track.albumArtUrl}
-                    alt={track.title}
+                    alt={track.title ?? ''}
                     fill
                     className={cn("rounded-lg object-cover shadow-lg", !isDeviceOnline && "grayscale")}
                     data-ai-hint="album cover"
@@ -78,28 +103,56 @@ export function PlaybackControls() {
           <p className="text-muted-foreground">{track?.artist ?? "—"}</p>
         </div>
 
-        <div className="w-full space-y-2">
-          <Slider
-            value={[currentProgress]}
-            max={trackDuration}
-            step={1}
-            onValueChange={onProgressChange}
-            disabled={!isDeviceOnline || !track}
-          />
-          <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{formatTime(currentProgress)}</span>
-            <span>{formatTime(trackDuration)}</span>
-          </div>
+        <div className="w-full max-w-xs space-y-4">
+            <div className="space-y-2">
+                <Label>Source</Label>
+                <Select value={playbackState.source} onValueChange={handleSourceChange} disabled={!isDeviceOnline}>
+                    <SelectTrigger>
+                        <div className="flex items-center gap-2">
+                            <SourceIcon className="h-4 w-4" />
+                            <SelectValue />
+                        </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                        {Object.entries(sourceLabels).map(([key, label]) => {
+                           const Icon = sourceIcons[key];
+                           return(
+                            <SelectItem key={key} value={key}>
+                                 <div className="flex items-center gap-2">
+                                    <Icon className="h-4 w-4" />
+                                    <span>{label}</span>
+                                 </div>
+                            </SelectItem>
+                           )
+                        })}
+                    </SelectContent>
+                </Select>
+            </div>
+          
+            <div className="space-y-2">
+                <Slider
+                    value={[currentProgress]}
+                    max={trackDuration}
+                    step={1}
+                    onValueChange={onProgressChange}
+                    disabled={!isDeviceOnline || !track || !isLocalSource}
+                />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{isLocalSource ? formatTime(currentProgress) : '--:--'}</span>
+                    <span>{isLocalSource ? formatTime(trackDuration) : '--:--'}</span>
+                </div>
+            </div>
         </div>
 
+
         <div className="flex items-center justify-center space-x-4 w-full">
-          <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !track}>
+          <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !track || !isLocalSource}>
             <Rewind className="h-6 w-6" />
           </Button>
           <Button size="lg" className="rounded-full w-16 h-16" onClick={onTogglePlay} disabled={!isDeviceOnline || !track}>
             {playbackState.isPlaying ? <Pause className="h-8 w-8" /> : <Play className="h-8 w-8" />}
           </Button>
-          <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !track}>
+          <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !track || !isLocalSource}>
             <FastForward className="h-6 w-6" />
           </Button>
         </div>

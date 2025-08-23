@@ -34,3 +34,10 @@ export interface MusicFolder {
   id: string;
   path: string;
 }
+
+export interface PlaybackState {
+    isPlaying: boolean;
+    progress: number;
+    volume: number;
+    source: string;
+}

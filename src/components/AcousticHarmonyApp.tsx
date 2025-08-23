@@ -9,7 +9,7 @@ import {
   SidebarInset,
 } from "@/components/ui/sidebar";
 import { DeviceList } from "@/components/DeviceList";
-import type { Device, Schedule, Track, Playlist as PlaylistType, MusicFolder } from "@/lib/types";
+import type { Device, Schedule, Track, Playlist as PlaylistType, MusicFolder, PlaybackState } from "@/lib/types";
 import { Speaker } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AppHeader } from "./AppHeader";
@@ -39,11 +39,7 @@ export interface AppState {
     playlists: PlaylistType[];
     availableTracks: Track[];
     musicFolders: MusicFolder[];
-    playbackState: {
-        isPlaying: boolean;
-        progress: number;
-        volume: number;
-    };
+    playbackState: PlaybackState;
 }
 
 export type AppActions = {
@@ -60,6 +56,7 @@ export type AppActions = {
     handleAddDevice: (device: Omit<Device, 'id' | 'online'>) => void;
     handleDiscoverDevices: () => Promise<Device[]>;
     handleDeleteDevice: (deviceId: string) => void;
+    handleSourceChange: (source: string) => void;
 };
 
 
@@ -81,10 +78,11 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
   const [playlists, setPlaylists] = React.useState<PlaylistType[]>([]);
   const [availableTracks, setAvailableTracks] = React.useState<Track[]>(MOCK_TRACKS);
   const [musicFolders, setMusicFolders] = React.useState<MusicFolder[]>([ { id: '1', path: '/Users/me/Music' } ]);
-  const [playbackState, setPlaybackState] = React.useState({
+  const [playbackState, setPlaybackState] = React.useState<PlaybackState>({
     isPlaying: false,
     progress: 60, 
     volume: 75,
+    source: 'local',
   });
 
   const { toast } = useToast();
@@ -141,7 +139,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
 
 
             } catch (error: any) {
-                if (error.name === 'AbortError') {
+                if (error.name === 'AbortError' || (error instanceof Error && error.message.includes('aborted'))) {
                     console.log('Notification fetch aborted.');
                     break;
                 }
@@ -170,7 +168,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     const device = devices.find(d => d.id === deviceId);
     if (device && device.online) {
         // Reset state for new device
-        setPlaybackState({ isPlaying: false, progress: 0, volume: 75 });
+        setPlaybackState({ isPlaying: false, progress: 0, volume: 75, source: 'local' });
         setTrack(MOCK_TRACKS[0] ?? null);
     } else {
         setTrack(null);
@@ -195,6 +193,26 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
 
   const handleVolumeChange = (value: number[]) => {
     setPlaybackState(prev => ({ ...prev, volume: value[0] }));
+  }
+
+  const handleSourceChange = (source: string) => {
+    setPlaybackState(prev => ({ ...prev, source }));
+    toast({
+        title: "Source Changed",
+        description: `Switched to ${source}.`,
+    });
+
+    if (source === 'local') {
+        setTrack(MOCK_TRACKS[0]);
+    } else {
+        setTrack({
+            id: 'ext-1',
+            title: `Playing from ${source}`,
+            artist: 'External Source',
+            albumArtUrl: 'https://placehold.co/300x300.png',
+            duration: 0,
+        });
+    }
   }
 
   const handleSaveSchedule = (schedule: Omit<Schedule, 'id'>) => {
@@ -308,6 +326,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     handleAddDevice,
     handleDiscoverDevices,
     handleDeleteDevice,
+    handleSourceChange,
   };
 
   return (
