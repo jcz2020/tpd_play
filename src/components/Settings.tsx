@@ -103,28 +103,12 @@ export function Settings() {
 
                     <Separator />
 
-                    <div className="space-y-4">
-                        <h3 className="font-medium text-foreground">DLNA Services</h3>
-                        <div className="space-y-2">
-                            <Label>Discovered Devices</Label>
-                            <div className="border rounded-md p-3 min-h-[80px] bg-muted/50">
-                                <p className="text-sm text-muted-foreground">No DLNA devices found on the network yet. The backend service will need to be implemented to discover them.</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <Separator />
-                    
                     {device ? (
                         <div className="space-y-4">
                             <h3 className="font-medium text-foreground">Device: {device.name}</h3>
                             <div className="space-y-2">
                                 <Label htmlFor="device-ip">Device IP Address</Label>
                                 <Input id="device-ip" defaultValue={device.ip} disabled />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="dlna-source">DLNA Source</Label>
-                                <Input id="dlna-source" placeholder="dlna://..." defaultValue="dlna://192.168.1.100:8200" />
                             </div>
                         </div>
                     ) : (

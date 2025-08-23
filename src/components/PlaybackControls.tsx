@@ -8,6 +8,8 @@ import { Slider } from "@/components/ui/slider";
 import { Pause, Play, Rewind, FastForward, Volume2, VolumeX, Music } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAppContext } from "./AcousticHarmonyApp";
+import { Separator } from "./ui/separator";
+import { Label } from "./ui/label";
 
 function formatTime(seconds: number) {
   const minutes = Math.floor(seconds / 60);
@@ -18,7 +20,7 @@ function formatTime(seconds: number) {
 export function PlaybackControls() {
   const { state, actions } = useAppContext();
   const { track, playbackState } = state;
-  const { onTogglePlay, onProgressChange, onVolumeChange } = actions;
+  const { handleTogglePlay: onTogglePlay, handleProgressChange: onProgressChange, handleVolumeChange: onVolumeChange } = actions;
   
   const device = state.devices.find(d => d.id === state.selectedDeviceId);
 
@@ -113,6 +115,16 @@ export function PlaybackControls() {
             onValueChange={onVolumeChange}
             disabled={!isDeviceOnline}
           />
+        </div>
+        <Separator className="my-4"/>
+        <div className="space-y-4 w-full">
+            <h3 className="font-medium text-foreground text-center">DLNA Services</h3>
+            <div className="space-y-2">
+                <Label>Discovered Devices</Label>
+                <div className="border rounded-md p-3 min-h-[80px] bg-muted/50">
+                    <p className="text-sm text-muted-foreground">No DLNA devices found on the network yet. The backend service will need to be implemented to discover them.</p>
+                </div>
+            </div>
         </div>
       </CardContent>
     </Card>
