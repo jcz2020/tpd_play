@@ -7,21 +7,13 @@ import {
   SidebarContent,
   SidebarHeader,
   SidebarInset,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarTrigger,
-  useSidebar,
 } from "@/components/ui/sidebar";
 import { DeviceList } from "@/components/DeviceList";
-import { PlaybackControls } from "@/components/PlaybackControls";
-import { Scheduling } from "@/components/Scheduling";
-import { Settings } from "@/components/Settings";
-import { MediaManagement } from "@/components/MediaManagement";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Device, Schedule, Track, Playlist as PlaylistType, MusicFolder } from "@/lib/types";
 import { Speaker } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { AppHeader } from "./AppHeader";
+import { AppNavigation } from "./AppNavigation";
 
 const MOCK_DEVICES: Device[] = [
     { id: '1', name: 'Living Room Speaker', ip: '192.168.1.100', online: true },
@@ -37,20 +29,47 @@ const MOCK_TRACKS: Track[] = [
     { id: 't5', title: 'Billie Jean', artist: 'Michael Jackson', albumArtUrl: 'https://placehold.co/300x300.png', duration: 294 },
 ];
 
-function AppHeader() {
-  const { isMobile } = useSidebar();
-  return (
-    <header className="flex h-14 items-center gap-4 border-b bg-background/95 px-4 lg:h-[60px] lg:px-6 backdrop-blur-sm sticky top-0 z-30">
-        {isMobile && <SidebarTrigger />}
-        <div className="flex items-center gap-2">
-            <Speaker className="h-6 w-6 text-primary" />
-            <h1 className="text-xl font-semibold">Acoustic Harmony</h1>
-        </div>
-    </header>
-  );
+
+export interface AppState {
+    devices: Device[];
+    selectedDeviceId: string | null;
+    schedules: Schedule[];
+    track: Track | null;
+    playlists: PlaylistType[];
+    availableTracks: Track[];
+    musicFolders: MusicFolder[];
+    playbackState: {
+        isPlaying: boolean;
+        progress: number;
+        volume: number;
+    };
 }
 
-export default function AcousticHarmonyApp() {
+export type AppActions = {
+    handleSelectDevice: (deviceId: string) => void;
+    handleTogglePlay: () => void;
+    handleProgressChange: (value: number[]) => void;
+    handleVolumeChange: (value: number[]) => void;
+    handleSaveSchedule: (schedule: Omit<Schedule, 'id'>) => void;
+    handleDeleteSchedule: (scheduleId: string) => void;
+    handleToggleSchedule: (scheduleId: string, enabled: boolean) => void;
+    handleSavePlaylist: (playlist: PlaylistType) => void;
+    handleDeletePlaylist: (playlistId: string) => void;
+    handleMusicFoldersChange: (folders: MusicFolder[]) => void;
+};
+
+
+export const AppContext = React.createContext<{ state: AppState, actions: AppActions } | null>(null);
+
+export const useAppContext = () => {
+    const context = React.useContext(AppContext);
+    if (!context) {
+        throw new Error("useAppContext must be used within an AppProvider");
+    }
+    return context;
+};
+
+export default function AcousticHarmonyApp({ children }: { children: React.ReactNode }) {
   const [devices, setDevices] = React.useState<Device[]>(MOCK_DEVICES);
   const [selectedDeviceId, setSelectedDeviceId] = React.useState<string | null>(MOCK_DEVICES[0]?.id ?? null);
   const [schedules, setSchedules] = React.useState<Schedule[]>([]);
@@ -220,9 +239,32 @@ export default function AcousticHarmonyApp() {
     });
   }
 
+  const state: AppState = {
+    devices,
+    selectedDeviceId,
+    schedules,
+    track,
+    playlists,
+    availableTracks,
+    musicFolders,
+    playbackState,
+  };
+
+  const actions: AppActions = {
+    handleSelectDevice,
+    handleTogglePlay,
+    handleProgressChange,
+    handleVolumeChange,
+    handleSaveSchedule,
+    handleDeleteSchedule,
+    handleToggleSchedule,
+    handleSavePlaylist,
+    handleDeletePlaylist,
+    handleMusicFoldersChange
+  };
 
   return (
-    <SidebarProvider>
+    <AppContext.Provider value={{ state, actions }}>
       <Sidebar side="left" className="border-r" collapsible="icon">
         <SidebarHeader>
            <div className="flex items-center gap-2 p-2">
@@ -236,60 +278,17 @@ export default function AcousticHarmonyApp() {
                 selectedDeviceId={selectedDeviceId}
                 onSelectDevice={handleSelectDevice}
             />
+            <AppNavigation />
         </SidebarContent>
       </Sidebar>
       <SidebarInset>
         <div className="flex h-screen flex-col">
             <AppHeader />
             <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-                <Tabs defaultValue="player" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3 max-w-lg mx-auto">
-                        <TabsTrigger value="player">Player</TabsTrigger>
-                        <TabsTrigger value="media">Media Management</TabsTrigger>
-                        <TabsTrigger value="schedules">Schedules</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="player" className="mt-6">
-                        <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-                            <div className="lg:col-span-2">
-                                <PlaybackControls 
-                                    device={selectedDevice}
-                                    track={track}
-                                    playbackState={playbackState}
-                                    onTogglePlay={handleTogglePlay}
-                                    onProgressChange={handleProgressChange}
-                                    onVolumeChange={handleVolumeChange}
-                                />
-                            </div>
-                            <div className="lg:col-span-1">
-                                <Settings 
-                                    device={selectedDevice}
-                                    musicFolders={musicFolders}
-                                    onMusicFoldersChange={handleMusicFoldersChange}
-                                />
-                            </div>
-                        </div>
-                    </TabsContent>
-                    <TabsContent value="media" className="mt-6">
-                        <MediaManagement
-                            playlists={playlists}
-                            availableTracks={availableTracks}
-                            onSavePlaylist={handleSavePlaylist}
-                            onDeletePlaylist={handleDeletePlaylist}
-                        />
-                    </TabsContent>
-                    <TabsContent value="schedules" className="mt-6">
-                        <Scheduling
-                            schedules={schedules}
-                            devices={devices}
-                            onSave={handleSaveSchedule}
-                            onDelete={handleDeleteSchedule}
-                            onToggle={handleToggleSchedule}
-                        />
-                    </TabsContent>
-                </Tabs>
+              {children}
             </main>
         </div>
       </SidebarInset>
-    </SidebarProvider>
+    </AppContext.Provider>
   );
 }

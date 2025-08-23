@@ -9,14 +9,14 @@ import { useToast } from "@/hooks/use-toast";
 import { Separator } from "./ui/separator";
 import * as React from "react";
 import { Loader2, FolderSync, PlusCircle, Trash2 } from "lucide-react";
+import { useAppContext } from "./AcousticHarmonyApp";
 
-interface SettingsProps {
-    device?: Device;
-    musicFolders: MusicFolder[];
-    onMusicFoldersChange: (folders: MusicFolder[]) => void;
-}
+export function Settings() {
+    const { state, actions } = useAppContext();
+    const { musicFolders, devices, selectedDeviceId } = state;
+    const { handleMusicFoldersChange } = actions;
+    const device = devices.find(d => d.id === selectedDeviceId);
 
-export function Settings({ device, musicFolders, onMusicFoldersChange }: SettingsProps) {
     const { toast } = useToast();
     const [isScanning, setIsScanning] = React.useState(false);
     const [localFolders, setLocalFolders] = React.useState<MusicFolder[]>(musicFolders);
@@ -39,7 +39,7 @@ export function Settings({ device, musicFolders, onMusicFoldersChange }: Setting
 
     const handleSaveChanges = (e: React.FormEvent) => {
         e.preventDefault();
-        onMusicFoldersChange(localFolders.filter(f => f.path.trim() !== ''));
+        handleMusicFoldersChange(localFolders.filter(f => f.path.trim() !== ''));
     }
 
     const handleScan = () => {

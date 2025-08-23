@@ -21,10 +21,7 @@ import { PlusCircle, Search } from "lucide-react";
 import type { Track } from "@/lib/types";
 import { useState } from "react";
 import Image from "next/image";
-
-interface MusicLibraryProps {
-    tracks: Track[];
-}
+import { useAppContext } from "./AcousticHarmonyApp";
 
 function formatTime(seconds: number) {
     const minutes = Math.floor(seconds / 60);
@@ -32,7 +29,9 @@ function formatTime(seconds: number) {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
-export function MusicLibrary({ tracks }: MusicLibraryProps) {
+export function MusicLibrary() {
+    const { state } = useAppContext();
+    const { availableTracks: tracks } = state;
     const [searchTerm, setSearchTerm] = useState("");
     
     const filteredTracks = tracks.filter(track => 

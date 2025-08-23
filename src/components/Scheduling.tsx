@@ -41,15 +41,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PlusCircle, Trash2 } from "lucide-react";
-import type { Device, Schedule } from "@/lib/types";
-
-interface SchedulingProps {
-    schedules: Schedule[];
-    devices: Device[];
-    onSave: (schedule: Omit<Schedule, 'id'>) => void;
-    onDelete: (scheduleId: string) => void;
-    onToggle: (scheduleId: string, enabled: boolean) => void;
-}
+import { useAppContext } from "./AcousticHarmonyApp";
+import type { Schedule } from "@/lib/types";
 
 const scheduleSchema = z.object({
     deviceId: z.string().min(1, "Please select a device."),
@@ -61,7 +54,11 @@ const scheduleSchema = z.object({
 
 type ScheduleFormValues = z.infer<typeof scheduleSchema>;
 
-export function Scheduling({ schedules, devices, onSave, onDelete, onToggle }: SchedulingProps) {
+export function Scheduling() {
+    const { state, actions } = useAppContext();
+    const { schedules, devices } = state;
+    const { handleSaveSchedule: onSave, handleDeleteSchedule: onDelete, handleToggleSchedule: onToggle } = actions;
+    
     const [open, setOpen] = React.useState(false);
 
     const form = useForm<ScheduleFormValues>({

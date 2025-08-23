@@ -6,21 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { Pause, Play, Rewind, FastForward, Volume2, VolumeX, Music } from "lucide-react";
-import type { Device, Track } from "@/lib/types";
 import { cn } from "@/lib/utils";
-
-interface PlaybackControlsProps {
-  device?: Device;
-  track: Track | null;
-  playbackState: {
-    isPlaying: boolean;
-    progress: number;
-    volume: number;
-  };
-  onTogglePlay: () => void;
-  onProgressChange: (value: number[]) => void;
-  onVolumeChange: (value: number[]) => void;
-}
+import { useAppContext } from "./AcousticHarmonyApp";
 
 function formatTime(seconds: number) {
   const minutes = Math.floor(seconds / 60);
@@ -28,14 +15,12 @@ function formatTime(seconds: number) {
   return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
-export function PlaybackControls({
-  device,
-  track,
-  playbackState,
-  onTogglePlay,
-  onProgressChange,
-  onVolumeChange
-}: PlaybackControlsProps) {
+export function PlaybackControls() {
+  const { state, actions } = useAppContext();
+  const { track, playbackState } = state;
+  const { onTogglePlay, onProgressChange, onVolumeChange } = actions;
+  
+  const device = state.devices.find(d => d.id === state.selectedDeviceId);
 
   const [isMuted, setIsMuted] = React.useState(false);
   const lastVolumeRef = React.useRef(playbackState.volume);
@@ -133,5 +118,3 @@ export function PlaybackControls({
     </Card>
   );
 }
-
-    
