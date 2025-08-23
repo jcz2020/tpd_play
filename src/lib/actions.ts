@@ -3,42 +3,16 @@
 
 import type { Device, Source } from "./types";
 
-// This is a mock function. In a real application, this would use a library 
-// like 'node-ssdp' or a custom implementation to scan the local network
-// for DLNA/UPnP devices and filter for B&O products.
+// This is a placeholder function. In a real application, this functionality
+// would need to be implemented by a local backend service that can scan the
+// network for DLNA/UPnP devices and then expose that to the frontend.
+// A web browser or a cloud-hosted server cannot directly scan a user's local network.
 export async function discoverDevices(): Promise<Device[]> {
-  console.log("Simulating network scan for B&O devices...");
-
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 2000));
-
-  // Simulate finding a few devices
-  const mockDiscoveredDevices: Device[] = [
-    {
-      id: 'd-1',
-      name: 'Beosound Stage',
-      ip: '192.168.1.150',
-      online: true
-    },
-    {
-        id: 'd-2',
-        name: 'Beoplay A9',
-        ip: '192.168.1.152',
-        online: true
-    },
-    {
-        id: 'd-3',
-        name: 'Beosound Emerge',
-        ip: '192.168.1.145',
-        online: true
-    }
-  ];
-
-  console.log(`Discovered ${mockDiscoveredDevices.length} devices.`);
-  
-  // In a real scenario, you would probably want to filter out devices
-  // that are already added to the user's list.
-  return mockDiscoveredDevices;
+  console.log("Attempting to scan for B&O devices...");
+  // In a real implementation, you would have logic here to talk to a local service.
+  // For now, we return an empty array as we can't perform a real scan.
+  console.log("No local discovery service found. Returning empty list.");
+  return [];
 }
 
 
@@ -47,22 +21,34 @@ export async function discoverDevices(): Promise<Device[]> {
 export async function getAvailableSources(deviceId: string, ip: string): Promise<Source[]> {
     console.log(`Fetching available sources for device ${deviceId} at ${ip}...`);
 
-    await new Promise(resolve => setTimeout(resolve, 500));
+    // In a real implementation, you would use fetch() to make a network request
+    // to the B&O device's local IP address.
+    // Example:
+    // try {
+    //   const response = await fetch(`http://${ip}/BeoZone/Zone/Sources`);
+    //   if (!response.ok) {
+    //     throw new Error('Failed to fetch sources from device');
+    //   }
+    //   const data = await response.json();
+    //   // ... process and return the sources
+    // } catch (error) {
+    //   console.error(`Could not fetch sources for ${ip}:`, error);
+    //   return [];
+    // }
 
-    // Based on the device, we can return different mock sources.
-    // This simulates different devices having different capabilities.
+
+    // For now, we return a default list of common sources as a placeholder.
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
     const mockSources: Source[] = [
         { id: "local", name: "Local Library", type: 'local'},
         { id: "spotify", name: "Spotify", type: "spotify" },
         { id: "line-in", name: "Line-In", type: "line-in" },
         { id: "bluetooth", name: "Bluetooth", type: "bluetooth" },
+        { id: "tidal", name: "Tidal", type: "tidal" },
+        { id: "deezer", name: "Deezer", type: "deezer" },
     ];
 
-    if (deviceId.includes('2') || deviceId === 'd-1') { // Mock BeoPlay A9 or Stage having more sources
-        mockSources.push({ id: "tidal", name: "Tidal", type: "tidal" });
-        mockSources.push({ id: "deezer", name: "Deezer", type: "deezer" });
-    }
-
-    console.log(`Found ${mockSources.length} sources for device ${deviceId}.`);
+    console.log(`Returning mock sources for device ${deviceId}.`);
     return mockSources;
 }
