@@ -59,6 +59,7 @@ export type AppActions = {
     handleMusicFoldersChange: (folders: MusicFolder[]) => void;
     handleAddDevice: (device: Omit<Device, 'id' | 'online'>) => void;
     handleDiscoverDevices: () => Promise<Device[]>;
+    handleDeleteDevice: (deviceId: string) => void;
 };
 
 
@@ -260,6 +261,24 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     });
   };
 
+  const handleDeleteDevice = (deviceId: string) => {
+    const deletedDevice = devices.find(d => d.id === deviceId);
+    if (!deletedDevice) return;
+
+    setDevices(prev => {
+        const newDevices = prev.filter(d => d.id !== deviceId);
+        if (selectedDeviceId === deviceId) {
+            setSelectedDeviceId(newDevices[0]?.id ?? null);
+        }
+        return newDevices;
+    });
+
+    toast({
+        title: "Device Removed",
+        description: `${deletedDevice.name} has been removed.`,
+    });
+  };
+
   const handleDiscoverDevices = async () => {
     return await discoverDevices();
   }
@@ -287,7 +306,8 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     handleDeletePlaylist,
     handleMusicFoldersChange,
     handleAddDevice,
-    handleDiscoverDevices
+    handleDiscoverDevices,
+    handleDeleteDevice,
   };
 
   return (
