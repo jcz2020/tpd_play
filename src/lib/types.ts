@@ -29,3 +29,8 @@ export interface Playlist {
   name: string;
   trackIds: string[];
 }
+
+export interface MusicFolder {
+  id: string;
+  path: string;
+}

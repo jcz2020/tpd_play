@@ -17,9 +17,9 @@ import { DeviceList } from "@/components/DeviceList";
 import { PlaybackControls } from "@/components/PlaybackControls";
 import { Scheduling } from "@/components/Scheduling";
 import { Settings } from "@/components/Settings";
-import { Playlist } from "@/components/Playlist";
+import { MediaManagement } from "@/components/MediaManagement";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { Device, Schedule, Track, Playlist as PlaylistType } from "@/lib/types";
+import type { Device, Schedule, Track, Playlist as PlaylistType, MusicFolder } from "@/lib/types";
 import { Speaker } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -33,6 +33,8 @@ const MOCK_TRACKS: Track[] = [
     { id: 't1', title: 'Bohemian Rhapsody', artist: 'Queen', albumArtUrl: 'https://placehold.co/300x300.png', duration: 355 },
     { id: 't2', title: 'Stairway to Heaven', artist: 'Led Zeppelin', albumArtUrl: 'https://placehold.co/300x300.png', duration: 482 },
     { id: 't3', title: 'Hotel California', artist: 'Eagles', albumArtUrl: 'https://placehold.co/300x300.png', duration: 391 },
+    { id: 't4', title: 'Smells Like Teen Spirit', artist: 'Nirvana', albumArtUrl: 'https://placehold.co/300x300.png', duration: 301 },
+    { id: 't5', title: 'Billie Jean', artist: 'Michael Jackson', albumArtUrl: 'https://placehold.co/300x300.png', duration: 294 },
 ];
 
 function AppHeader() {
@@ -55,6 +57,7 @@ export default function AcousticHarmonyApp() {
   const [track, setTrack] = React.useState<Track | null>(MOCK_TRACKS[0]);
   const [playlists, setPlaylists] = React.useState<PlaylistType[]>([]);
   const [availableTracks, setAvailableTracks] = React.useState<Track[]>(MOCK_TRACKS);
+  const [musicFolders, setMusicFolders] = React.useState<MusicFolder[]>([ { id: '1', path: '/Users/me/Music' } ]);
   const [playbackState, setPlaybackState] = React.useState({
     isPlaying: false,
     progress: 60, 
@@ -75,7 +78,6 @@ export default function AcousticHarmonyApp() {
     let isMounted = true;
 
     const fetchNotifications = async () => {
-        let lastNotificationId: string | null = null;
         while (isMounted) {
             try {
                 // In a real app, you would use the device's IP. 
@@ -90,7 +92,7 @@ export default function AcousticHarmonyApp() {
                     continue;
                 }
 
-                const notification = await response.json();
+                await response.json();
                 
                 if (signal.aborted) break;
 
@@ -209,6 +211,14 @@ export default function AcousticHarmonyApp() {
           description: "The playlist has been removed.",
       });
   };
+  
+  const handleMusicFoldersChange = (folders: MusicFolder[]) => {
+    setMusicFolders(folders);
+    toast({
+        title: "Music Folders Updated",
+        description: "Your music folder list has been saved.",
+    });
+  }
 
 
   return (
@@ -235,7 +245,7 @@ export default function AcousticHarmonyApp() {
                 <Tabs defaultValue="player" className="w-full">
                     <TabsList className="grid w-full grid-cols-3 max-w-lg mx-auto">
                         <TabsTrigger value="player">Player</TabsTrigger>
-                        <TabsTrigger value="playlists">Playlists</TabsTrigger>
+                        <TabsTrigger value="media">Media Management</TabsTrigger>
                         <TabsTrigger value="schedules">Schedules</TabsTrigger>
                     </TabsList>
                     <TabsContent value="player" className="mt-6">
@@ -251,16 +261,20 @@ export default function AcousticHarmonyApp() {
                                 />
                             </div>
                             <div className="lg:col-span-1">
-                                <Settings device={selectedDevice}/>
+                                <Settings 
+                                    device={selectedDevice}
+                                    musicFolders={musicFolders}
+                                    onMusicFoldersChange={handleMusicFoldersChange}
+                                />
                             </div>
                         </div>
                     </TabsContent>
-                    <TabsContent value="playlists" className="mt-6">
-                        <Playlist
+                    <TabsContent value="media" className="mt-6">
+                        <MediaManagement
                             playlists={playlists}
                             availableTracks={availableTracks}
-                            onSave={handleSavePlaylist}
-                            onDelete={handleDeletePlaylist}
+                            onSavePlaylist={handleSavePlaylist}
+                            onDeletePlaylist={handleDeletePlaylist}
                         />
                     </TabsContent>
                     <TabsContent value="schedules" className="mt-6">
@@ -279,5 +293,3 @@ export default function AcousticHarmonyApp() {
     </SidebarProvider>
   );
 }
-
-    

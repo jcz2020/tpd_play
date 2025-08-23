@@ -226,7 +226,7 @@ export function Playlist({ playlists, availableTracks, onSave, onDelete }: Playl
                 </Table>
                 {playlists.length === 0 && (
                     <div className="text-center text-muted-foreground py-8">
-                        No playlists yet.
+                        No playlists yet. Create one to get started.
                     </div>
                 )}
             </CardContent>
