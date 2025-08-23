@@ -1,6 +1,12 @@
 
 "use client";
 
+/**
+ * @fileoverview This component renders the list of available devices in the sidebar.
+ * It allows users to select a device to control, add new devices via a dialog,
+ * and delete existing devices.
+ */
+
 import type { Device } from "@/lib/types";
 import { SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarMenuAction } from "@/components/ui/sidebar";
 import { Speaker, PlusCircle, MoreVertical, Trash2 } from "lucide-react";

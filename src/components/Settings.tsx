@@ -1,6 +1,13 @@
 
 "use client";
 
+/**
+ * @fileoverview This component renders the main settings page for the application.
+ * Currently, its primary function is to manage the list of local music folders
+ * that the backend will scan to build the music library. It also provides a
+ * button to trigger the scan manually.
+ */
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";

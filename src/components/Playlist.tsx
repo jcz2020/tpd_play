@@ -1,4 +1,11 @@
+
 "use client";
+
+/**
+ * @fileoverview This component handles the creation, editing, and display of playlists.
+ * It features a table listing existing playlists and a dialog to create new ones
+ * or edit existing ones by selecting tracks from the available music library.
+ */
 
 import * as React from "react";
 import { z } from "zod";

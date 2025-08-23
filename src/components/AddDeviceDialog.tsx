@@ -1,6 +1,12 @@
 
 "use client";
 
+/**
+ * @fileoverview This component defines a dialog for adding new devices.
+ * It provides two methods for adding a device: automatic discovery via network
+ * scanning and manual entry of the device's name and IP address.
+ */
+
 import * as React from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";

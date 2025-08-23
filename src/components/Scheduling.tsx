@@ -1,4 +1,13 @@
+
 "use client";
+
+/**
+ * @fileoverview This component provides the UI for managing scheduled tasks.
+ * Users can view a list of existing schedules, create new schedules through
+ * a dialog, and enable/disable or delete them.
+ * Note: The actual scheduling logic (e.g., a cron job) is not implemented here,
+ * this component only manages the schedule configuration.
+ */
 
 import * as React from "react";
 import { z } from "zod";

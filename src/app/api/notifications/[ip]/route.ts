@@ -1,4 +1,9 @@
-
+/**
+ * @fileoverview This file defines a Next.js API Route that acts as a proxy
+ * for the B&O device's long-polling notification endpoint. This is necessary
+ * to bypass browser CORS restrictions and to manage the connection lifecycle.
+ * @module app/api/notifications/[ip]/route
+ */
 import { NextRequest, NextResponse } from 'next/server';
 
 // This is a Route Handler that acts as a proxy for the B&O notification endpoint.
@@ -6,6 +11,13 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic'; // Ensures this route is not cached
 
+/**
+ * Handles GET requests to this route. It establishes a long-polling connection
+ * to the B&O device's notification endpoint and streams back any received events.
+ * @param request The incoming Next.js request object.
+ * @param params An object containing the dynamic route parameters, in this case the device's IP address.
+ * @returns A NextResponse object containing the notification data or an error.
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: { ip: string } }

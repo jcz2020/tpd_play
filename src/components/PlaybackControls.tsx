@@ -1,6 +1,13 @@
 
 "use client";
 
+/**
+ * @fileoverview This component renders the main playback control interface.
+ * It includes the album art, track information, progress bar, playback buttons
+ * (play/pause, next, previous), volume control, and source selector.
+ * It receives all its state and action handlers from the AppContext.
+ */
+
 import * as React from "react";
 import Image from "next/image";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -13,6 +20,11 @@ import { useAppContext } from "./AcousticHarmonyApp";
 import { Label } from "./ui/label";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
+/**
+ * Formats a duration from seconds into a "m:ss" string.
+ * @param seconds The duration in seconds.
+ * @returns The formatted time string.
+ */
 function formatTime(seconds: number) {
   if (isNaN(seconds) || seconds < 0) return "0:00";
   const minutes = Math.floor(seconds / 60);

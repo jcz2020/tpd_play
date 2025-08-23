@@ -1,6 +1,13 @@
 
 "use client"
 
+/**
+ * @fileoverview This component displays the "Now Playing" list or queue.
+ * It allows users to select a playlist from a dropdown, and then shows the tracks
+ * within that playlist. It also highlights the currently playing track.
+ * If an external source (like Spotify) is active, it shows a message instead.
+ */
+
 import * as React from "react";
 import { useAppContext } from "./AcousticHarmonyApp";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";

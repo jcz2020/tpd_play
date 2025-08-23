@@ -1,6 +1,20 @@
 
 "use client";
 
+/**
+ * @fileoverview This is the root component of the Acoustic Harmony application.
+ * It serves as the central hub for state management and business logic.
+ * It fetches data, handles user actions, and provides state and actions down
+ * to all child components via the React Context API (`AppContext`).
+ *
+ * This component orchestrates:
+ * - Device discovery and selection.
+ * - Real-time playback state synchronization via long-polling.
+ * - User actions for playback control (play, pause, volume, etc.).
+ * - Management of playlists, schedules, and settings.
+ * - Communication with the backend via Server Actions.
+ */
+
 import * as React from "react";
 import {
   Sidebar,
@@ -34,6 +48,9 @@ import {
     scanMusicFolders as scanDeviceMusicFolders
 } from "@/lib/actions";
 
+/**
+ * Defines the shape of the global application state.
+ */
 export interface AppState {
     devices: Device[];
     selectedDeviceId: string | null;
@@ -47,6 +64,9 @@ export interface AppState {
     playbackState: PlaybackState;
 }
 
+/**
+ * Defines the shape of the actions available to all components.
+ */
 export type AppActions = {
     handleSelectDevice: (deviceId: string) => void;
     handleTogglePlay: () => void;
@@ -70,9 +90,16 @@ export type AppActions = {
     handleScanMusicFolders: () => Promise<{ success: boolean, message: string, count: number }>;
 };
 
-
+/**
+ * React Context for providing global state and actions to the entire application.
+ */
 export const AppContext = React.createContext<{ state: AppState, actions: AppActions } | null>(null);
 
+/**
+ * Custom hook for consuming the AppContext.
+ * Provides a convenient way for child components to access state and actions.
+ * @returns The application context value.
+ */
 export const useAppContext = () => {
     const context = React.useContext(AppContext);
     if (!context) {

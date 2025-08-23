@@ -1,6 +1,12 @@
 
 "use client"
 
+/**
+ * @fileoverview This component displays the user's entire music library in a searchable,
+ * sortable table. It shows tracks that have been discovered by the backend scanning
+ * process from the folders specified in the Settings.
+ */
+
 import {
     Card,
     CardContent,
@@ -23,6 +29,11 @@ import { useState } from "react";
 import Image from "next/image";
 import { useAppContext } from "./AcousticHarmonyApp";
 
+/**
+ * Formats a duration from seconds into a "m:ss" string.
+ * @param seconds The duration in seconds.
+ * @returns The formatted time string.
+ */
 function formatTime(seconds: number) {
     if (isNaN(seconds) || seconds <= 0) return '0:00';
     const minutes = Math.floor(seconds / 60);
