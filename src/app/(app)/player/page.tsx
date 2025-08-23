@@ -1,3 +1,9 @@
+/**
+ * @fileoverview This file defines the Player page, which is the main
+ * user interface for controlling speaker playback. It combines the
+ * "Now Playing" list with the playback controls into a single view.
+ * @module app/(app)/player/page
+ */
 
 "use client";
 import { NowPlayingList } from "@/components/NowPlayingList";
