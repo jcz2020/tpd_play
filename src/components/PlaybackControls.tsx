@@ -151,7 +151,7 @@ export function PlaybackControls() {
         </div>
 
         <div className="flex items-center justify-center space-x-2 w-full py-2">
-            <Tooltip>
+            <Tooltip key="shuffle-tooltip">
                 <TooltipTrigger asChild>
                     <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !isLocalSource} className="w-12 h-12 text-muted-foreground hover:text-foreground">
                         <Shuffle className={cn(playbackState.playMode === 'shuffle' && 'text-primary')} />
@@ -176,7 +176,7 @@ export function PlaybackControls() {
             <FastForward className="h-6 w-6" />
           </Button>
           
-          <Tooltip>
+          <Tooltip key="playmode-tooltip">
                 <TooltipTrigger asChild>
                     <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !isLocalSource} className="w-12 h-12 text-muted-foreground hover:text-foreground" onClick={nextPlayMode}>
                          <playModeInfo.Icon className={cn((playbackState.playMode === 'repeat-list' || playbackState.playMode === 'repeat-one') && 'text-primary')} />

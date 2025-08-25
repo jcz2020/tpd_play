@@ -313,7 +313,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
         console.log(`Aborting notification listener for ${device.name}.`);
         abortController.abort();
     };
-  }, [selectedDeviceId, devices, isLoaded, playbackState.track?.id]);
+  }, [selectedDeviceId, isLoaded]); // Use only stable dependencies
 
 
   const handleSelectDevice = (deviceId: string) => {
@@ -591,7 +591,6 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     handlePlayModeChange,
     handleSelectPlaylist,
     handleSelectTrack,
-isLoaded,
     handleScanMusicFolders,
     handleGetUserHomeDir
   };
