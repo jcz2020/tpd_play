@@ -8,6 +8,7 @@
 
 # Local-specific data
 /src/lib/db.json
+src/lib/db.json
 
 # Testing
 /coverage
