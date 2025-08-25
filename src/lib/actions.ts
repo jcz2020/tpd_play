@@ -392,6 +392,7 @@ export async function scanMusicFolders(): Promise<{ success: boolean, message: s
     let filesScanned = 0;
 
     for (const folder of folders) {
+        if (!folder.path) continue;
         try {
             const dirents = await fs.readdir(folder.path, { withFileTypes: true });
             for (const dirent of dirents) {
