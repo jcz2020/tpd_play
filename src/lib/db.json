@@ -1,6 +1,12 @@
-
 {
-  "devices": [],
+  "devices": [
+    {
+      "name": "Beoplay A9",
+      "ip": "192.168.31.101",
+      "id": "a096eb04-f16f-4f8d-b17d-a104d0b41d78",
+      "online": true
+    }
+  ],
   "playlists": [],
   "musicFolders": [],
   "tracks": []

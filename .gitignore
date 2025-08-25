@@ -33,3 +33,4 @@ src/lib/db.json
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+src/lib/db.json
