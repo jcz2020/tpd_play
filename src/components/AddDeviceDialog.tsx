@@ -36,6 +36,8 @@ import { useAppContext } from "./AcousticHarmonyApp";
 import type { NewDevice } from "@/lib/types";
 import { ScrollArea } from "./ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
+import { Terminal } from "lucide-react";
 
 
 const manualAddSchema = z.object({
@@ -51,6 +53,7 @@ export function AddDeviceDialog({ children }: { children: React.ReactNode }) {
     const [open, setOpen] = React.useState(false);
     const [isScanning, setIsScanning] = React.useState(false);
     const [scanError, setScanError] = React.useState<string | null>(null);
+    const [isConnectionError, setIsConnectionError] = React.useState(false);
     const [discoveredDevices, setDiscoveredDevices] = React.useState<NewDevice[]>([]);
 
     const form = useForm<ManualAddFormValues>({
@@ -64,6 +67,7 @@ export function AddDeviceDialog({ children }: { children: React.ReactNode }) {
     const handleScan = async () => {
         setIsScanning(true);
         setScanError(null);
+        setIsConnectionError(false);
         setDiscoveredDevices([]);
         try {
             const foundDevices = await actions.handleDiscoverDevices();
@@ -71,9 +75,15 @@ export function AddDeviceDialog({ children }: { children: React.ReactNode }) {
                 setScanError("No new devices found. Ensure they are on the same network and the local discovery service is running.");
             }
             setDiscoveredDevices(foundDevices);
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            setScanError("Failed to connect to the discovery service. Please ensure it's running.");
+            const errorMessage = error.message || "An unknown error occurred.";
+            if (errorMessage.includes('ECONNREFUSED') || errorMessage.toLowerCase().includes('failed to fetch')) {
+                setScanError("Failed to connect to the discovery service.");
+                setIsConnectionError(true);
+            } else {
+                setScanError(errorMessage);
+            }
         } finally {
             setIsScanning(false);
         }
@@ -105,6 +115,7 @@ export function AddDeviceDialog({ children }: { children: React.ReactNode }) {
             setIsScanning(false);
             setDiscoveredDevices([]);
             setScanError(null);
+            setIsConnectionError(false);
             form.reset();
         }
     }
@@ -130,6 +141,18 @@ export function AddDeviceDialog({ children }: { children: React.ReactNode }) {
                                 {isScanning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                                 {isScanning ? "Scanning..." : "Scan Again"}
                             </Button>
+                            {isConnectionError && (
+                                <Alert variant="destructive">
+                                    <Terminal className="h-4 w-4" />
+                                    <AlertTitle>Connection Error</AlertTitle>
+                                    <AlertDescription>
+                                        Could not connect to the discovery service. Please ensure it's running in a separate terminal with the command:
+                                        <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold mt-2 block">
+                                            npm run discover
+                                        </code>
+                                    </AlertDescription>
+                                </Alert>
+                            )}
                             <ScrollArea className="h-60 rounded-md border">
                                 <div className="p-4">
                                 {isScanning && discoveredDevices.length === 0 && (
@@ -140,7 +163,7 @@ export function AddDeviceDialog({ children }: { children: React.ReactNode }) {
                                 {!isScanning && discoveredDevices.length === 0 && (
                                     <div className="flex justify-center items-center h-full text-center">
                                         <p className="text-sm text-muted-foreground p-4">
-                                            {scanError ? scanError : 'No new devices found. Try scanning again.'}
+                                            {scanError && !isConnectionError ? scanError : 'No new devices found. Try scanning again.'}
                                         </p>
                                     </div>
                                 )}
