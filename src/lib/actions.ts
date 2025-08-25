@@ -95,7 +95,22 @@ const beoApi = {
             return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500 });
         }
     },
-  };
+};
+
+/**
+ * Checks if a device is online by making a simple request.
+ * @param ip The IP address of the device.
+ * @returns A promise that resolves to true if the device is online, false otherwise.
+ */
+async function checkDeviceOnline(ip: string): Promise<boolean> {
+    try {
+        const res = await fetch(`http://${ip}:8080/BeoDevice`, { cache: 'no-store', signal: AbortSignal.timeout(1000) });
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
+
 
 // --- Device Management ---
 
@@ -128,7 +143,8 @@ export async function addDevice(device: NewDevice): Promise<Device> {
     // Check if device with the same IP already exists
     const existingDevice = db.devices.find(d => d.ip === device.ip);
     if (existingDevice) {
-        return existingDevice;
+        const isOnline = await checkDeviceOnline(existingDevice.ip);
+        return { ...existingDevice, online: isOnline };
     }
     const newDevice: Device = { ...device, id: randomUUID(), online: true };
     db.devices.push(newDevice);
@@ -368,47 +384,44 @@ export async function scanMusicFolders(): Promise<{ success: boolean, message: s
     const folders = db.musicFolders;
 
     if (!folders || folders.length === 0) {
-        return { success: false, message: "No music folders configured.", count: 0 };
+        return { success: true, message: "No music folders configured.", count: 0 };
     }
 
-    const supportedExtensions = ['.mp3', '.flac', '.wav', '.ogg', '.m4a'];
-    let allTracks: Track[] = [];
+    const allTracks: Track[] = [];
+    const supportedExtensions = ['.mp3', '.flac', '.wav', '.m4a'];
     let filesScanned = 0;
 
     for (const folder of folders) {
-        if (!folder.path) continue;
         try {
-            console.log(`Scanning folder: ${folder.path}`);
-            const dirents = await fs.readdir(folder.path, { withFileTypes: true, recursive: true });
+            const dirents = await fs.readdir(folder.path, { withFileTypes: true });
             for (const dirent of dirents) {
                 const filePath = path.join(folder.path, dirent.name);
-                if (dirent.isFile() && supportedExtensions.includes(path.extname(filePath).toLowerCase())) {
+                if (dirent.isFile() && supportedExtensions.includes(path.extname(dirent.name).toLowerCase())) {
                     filesScanned++;
                     try {
-                       const metadata = await mm.parseFile(filePath);
-                       const track: Track = {
-                            id: randomUUID(),
+                        const metadata = await mm.parseFile(filePath);
+                        const track: Track = {
+                            id: `local-${randomUUID()}`,
                             title: metadata.common.title ?? path.basename(filePath),
                             artist: metadata.common.artist ?? 'Unknown Artist',
-                            albumArtUrl: 'https://placehold.co/100x100.png', // Placeholder, could be extracted if available
+                            albumArtUrl: 'https://placehold.co/300x300.png', // Placeholder, real art is complex
                             duration: metadata.format.duration ?? 0,
                             path: filePath,
-                       };
-                       allTracks.push(track);
-                    } catch (err) {
-                        console.warn(`Could not parse metadata for ${filePath}:`, err);
+                        };
+                        allTracks.push(track);
+                    } catch (metaError) {
+                        console.warn(`Could not parse metadata for ${filePath}:`, metaError);
                     }
                 }
             }
-        } catch (error) {
-            console.error(`Error scanning folder ${folder.path}:`, error);
-            return { success: false, message: `Error scanning folder: ${folder.path}. Please check if the path is correct and accessible.`, count: 0 };
+        } catch (readError) {
+            console.error(`Could not read directory ${folder.path}:`, readError);
+            return { success: false, message: `Error reading folder: ${folder.path}. Please check path and permissions.`, count: 0 };
         }
     }
 
     db.tracks = allTracks;
     await saveDb(db);
-
-    console.log(`Scan complete. Found ${allTracks.length} tracks from ${filesScanned} files.`);
+    console.log(`Scan complete. Scanned ${filesScanned} files and found ${allTracks.length} tracks.`);
     return { success: true, message: `Scan complete. Found ${allTracks.length} tracks.`, count: allTracks.length };
 }
