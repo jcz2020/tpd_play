@@ -10,7 +10,7 @@ This is a Next.js application for discovering, controlling, and scheduling your 
 - **Playlist Management**: Create and manage custom playlists from your local music library.
 - **Scheduling**: Set schedules to automate tasks like turning speakers on or off at a specific time.
 
-## Project Documentation
+## Project Documentation (English)
 
 For detailed information about the project's architecture, development guidelines, and API reference, please refer to the documentation in the `/docs` directory.
 
@@ -20,6 +20,17 @@ For detailed information about the project's architecture, development guideline
 | [Frontend Development](./docs/02-frontend-development.md) | Guidelines for building UI components and managing frontend state.                     |
 | [Backend Development](./docs/03-backend-development.md)  | An explanation of the server-side logic, including Server Actions and database access. |
 | [API Reference](./docs/04-api-reference.md)           | Detailed reference for all available Server Actions and data types.                  |
+
+## 项目文档 (中文)
+
+关于项目架构、开发指南和API参考的详细信息，请参阅 `/docs` 目录中的文档。
+
+| 文档                        | 描述                                                                          |
+| ------------------------------- | ------------------------------------------------------------------------------------ |
+| [项目架构](./docs/01-project-architecture-zh.md) | 关于技术栈和项目结构的高层概述。                 |
+| [前端开发](./docs/02-frontend-development-zh.md) | 构建UI组件和管理前端状态的指南。                     |
+| [后端开发](./docs/03-backend-development-zh.md)  | 对服务端逻辑的解释，包括 Server Actions 和数据库访问。 |
+| [API 参考](./docs/04-api-reference-zh.md)           | 所有可用的 Server Actions 和数据类型的详细参考。                  |
 
 
 ## Getting Started
