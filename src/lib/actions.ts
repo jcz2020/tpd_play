@@ -1,40 +1,26 @@
 
-"use server";
 
-/**
- * @fileoverview This file contains all the server-side actions for the Acoustic Harmony application.
- * These actions are responsible for all backend logic, including device communication,
- * database operations, and file system interactions. They are designed to be called
- * directly from client components ("use client").
- */
+"use server";
 
 import type { Device, NewDevice, PlaybackState, PlayMode, Source, Track, MusicFolder, PlayState } from "./types";
 import { getDb, saveDb } from "./db";
 import { randomUUID } from "crypto";
 import { promises as fs } from 'fs';
 import path from 'path';
+import os from 'os';
+import musicMetadata from 'music-metadata';
 
-// This is a mock API client. In a real application, this would be a proper
-// library for interacting with the B&O API.
+
 const beoApi = {
-    /**
-     * Performs a GET request to the B&O device API.
-     * @param ip The IP address of the device.
-     * @param path The API endpoint path.
-     * @returns The JSON response from the device, or an empty object on failure.
-     */
     get: async (ip: string, path: string) => {
-      // In a real app, you'd add error handling, headers, etc.
       const url = `http://${ip}:8080/${path}`;
       console.log(`BEO_API GET: ${url}`);
       try {
         const response = await fetch(url, { cache: 'no-store' });
         if (!response.ok) {
           console.error(`API GET request to ${url} failed with status ${response.status}`);
-          // Return an empty object for consistency in failure cases
           return {}; 
         }
-        // Handle cases where the response body might be empty
         const text = await response.text();
         return text ? JSON.parse(text) : {};
       } catch (e) {
@@ -42,13 +28,6 @@ const beoApi = {
         return {};
       }
     },
-    /**
-     * Performs a POST request to the B&O device API.
-     * @param ip The IP address of the device.
-     * @param path The API endpoint path.
-     * @param body The JSON body to send with the request.
-     * @returns The raw fetch Response object.
-     */
     post: async (ip: string, path: string, body: any = {}) => {
       const url = `http://${ip}:8080/${path}`;
       console.log(`BEO_API POST: ${url}`, body);
@@ -68,13 +47,6 @@ const beoApi = {
         return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500 });
       }
     },
-    /**
-     * Performs a PUT request to the B&O device API.
-     * @param ip The IP address of the device.
-     * @param path The API endpoint path.
-     * @param body The JSON body to send with the request.
-     * @returns The raw fetch Response object.
-     */
     put: async (ip: string, path: string, body: any = {}) => {
         const url = `http://${ip}:8080/${path}`;
         console.log(`BEO_API PUT: ${url}`, body);
@@ -96,11 +68,6 @@ const beoApi = {
     },
 };
 
-/**
- * Checks if a device is online by making a simple request.
- * @param ip The IP address of the device.
- * @returns A promise that resolves to true if the device is online, false otherwise.
- */
 async function checkDeviceOnline(ip: string): Promise<boolean> {
     try {
         const res = await fetch(`http://${ip}:8080/BeoDevice`, { cache: 'no-store', signal: AbortSignal.timeout(1000) });
@@ -110,16 +77,8 @@ async function checkDeviceOnline(ip: string): Promise<boolean> {
     }
 }
 
-
-// --- Device Management ---
-
-/**
- * Retrieves all saved devices from the database and checks their online status.
- * @returns A promise that resolves to an array of Device objects.
- */
 export async function getDevices(): Promise<Device[]> {
   const db = await getDb();
-  // For now, assume devices are online. A real app might ping them.
   const devicesWithOnlineStatus = await Promise.all(db.devices.map(async (d) => {
     const isOnline = await checkDeviceOnline(d.ip);
     return { ...d, online: isOnline };
@@ -127,14 +86,8 @@ export async function getDevices(): Promise<Device[]> {
   return devicesWithOnlineStatus;
 }
 
-/**
- * Adds a new device to the database or returns the existing one if the IP matches.
- * @param device The new device to add (name and IP).
- * @returns A promise that resolves to the full Device object (including ID and online status).
- */
 export async function addDevice(device: NewDevice): Promise<Device> {
     const db = await getDb();
-    // Check if device with the same IP already exists
     const existingDevice = db.devices.find(d => d.ip === device.ip);
     if (existingDevice) {
         const isOnline = await checkDeviceOnline(existingDevice.ip);
@@ -146,11 +99,6 @@ export async function addDevice(device: NewDevice): Promise<Device> {
     return newDevice;
 }
 
-/**
- * Deletes a device from the database.
- * @param deviceId The ID of the device to delete.
- * @returns A promise that resolves to an object indicating success or failure.
- */
 export async function deleteDevice(deviceId: string): Promise<{success: boolean}> {
     const db = await getDb();
     const initialLength = db.devices.length;
@@ -162,10 +110,6 @@ export async function deleteDevice(deviceId: string): Promise<{success: boolean}
     return { success: false };
 }
 
-/**
- * Scans the local network for discoverable B&O devices using a local discovery service.
- * @returns A promise that resolves to an array of discovered devices (without ID or online status).
- */
 export async function discoverDevices(): Promise<Omit<Device, 'id' | 'online'>[]> {
   console.log("Attempting to scan for B&O devices via local discovery service...");
   try {
@@ -178,19 +122,10 @@ export async function discoverDevices(): Promise<Omit<Device, 'id' | 'online'>[]
     return devices;
   } catch (error) {
     console.error("Could not connect to the local discovery service. Is it running?", error);
-    // Return an empty array on error so the UI can handle it gracefully.
     return [];
   }
 }
 
-// --- Playback Control ---
-
-/**
- * Retrieves the list of available playback sources for a specific device.
- * @param deviceId The ID of the device (currently unused, but good for future-proofing).
- * @param ip The IP address of the device.
- * @returns A promise that resolves to an array of Source objects.
- */
 export async function getAvailableSources(deviceId: string, ip: string): Promise<Source[]> {
     console.log(`Fetching available sources for device ${deviceId} at ${ip}...`);
     try {
@@ -199,7 +134,6 @@ export async function getAvailableSources(deviceId: string, ip: string): Promise
             console.warn(`No sources data received from ${ip}`);
             return [];
         }
-        // The sources are in a nested object, so we need to extract them.
         return Object.values(data.sources).map((source: any) => ({
             id: source.id,
             name: source.friendlyName,
@@ -211,16 +145,8 @@ export async function getAvailableSources(deviceId: string, ip: string): Promise
     }
 }
 
-/**
- * Retrieves the current playback state from a device.
- * This includes track info, progress, volume, source, and play mode.
- * @param deviceId The ID of the device (currently unused).
- * @param ip The IP address of the device.
- * @returns A promise that resolves to a PlaybackState object.
- */
 export async function getPlaybackState(deviceId: string, ip: string): Promise<PlaybackState> {
     try {
-      // Fetch both stream and volume data in parallel for efficiency
       const [streamData, volumeData] = await Promise.all([
         beoApi.get(ip, 'BeoZone/Zone/Stream'),
         beoApi.get(ip, 'BeoDevice/settings/volume')
@@ -229,7 +155,6 @@ export async function getPlaybackState(deviceId: string, ip: string): Promise<Pl
       const apiTrack = streamData?.track;
       let track: Track | null = null;
 
-      // Only create a track object if we have a title from the API
       if (apiTrack && apiTrack.title) {
         track = {
             id: apiTrack.id ?? randomUUID(),
@@ -252,7 +177,6 @@ export async function getPlaybackState(deviceId: string, ip: string): Promise<Pl
 
     } catch (error) {
       console.error(`Failed to get playback state for ${ip}:`, error);
-      // Return a sensible default "offline" or "error" state
       return {
         state: "stopped",
         progress: 0,
@@ -264,156 +188,110 @@ export async function getPlaybackState(deviceId: string, ip: string): Promise<Pl
     }
 }
 
-/**
- * Sets the playback state of a device (e.g., to 'playing' or 'paused').
- * @param deviceId The ID of the device (currently unused).
- * @param ip The IP address of the device.
- * @param state The desired state: 'playing' or 'paused'.
- */
 export async function setPlaybackState(deviceId: string, ip: string, state: 'playing' | 'paused'): Promise<void> {
     const command = state === 'playing' ? 'play' : 'pause';
     await beoApi.post(ip, `BeoZone/Zone/Player/${command}`);
 }
 
-/**
- * Seeks the currently playing track to a specific time.
- * @param deviceId The ID of the device (currently unused).
- * @param ip The IP address of the device.
- * @param progress The time to seek to, in seconds.
- */
 export async function seekTo(deviceId: string, ip: string, progress: number): Promise<void> {
-    // The API expects the progress in seconds, ensure it's a whole number.
     await beoApi.put(ip, 'BeoZone/Zone/Player/progress', { progress: Math.round(progress) });
 }
 
-/**
- * Sets the volume of a device.
- * @param deviceId The ID of the device (currently unused).
- * @param ip The IP address of the device.
- * @param volume The desired volume level (0-100).
- */
 export async function setVolume(deviceId: string, ip: string, volume: number): Promise<void> {
     await beoApi.put(ip, 'BeoDevice/settings/volume', { level: volume });
 }
 
-/**
- * Skips to the next track in the queue.
- * @param deviceId The ID of the device (currently unused).
- * @param ip The IP address of the device.
- */
 export async function nextTrack(deviceId: string, ip: string): Promise<void> {
     await beoApi.post(ip, 'BeoZone/Zone/Player/forward');
 }
 
-/**
- * Goes back to the previous track in the queue.
- * @param deviceId The ID of the device (currently unused).
- * @param ip The IP address of the device.
- */
 export async function previousTrack(deviceId: string, ip: string): Promise<void> {
     await beoApi.post(ip, 'BeoZone/Zone/Player/backward');
 }
 
-/**
- * Changes the active playback source on a device.
- * @param deviceId The ID of the device (currently unused).
- * @param ip The IP address of the device.
- * @param sourceId The ID of the source to switch to.
- */
 export async function changeSource(deviceId: string, ip: string, sourceId: string): Promise<void> {
-    // The API expects the source ID in the body for the POST request
     await beoApi.post(ip, 'BeoZone/Zone/ActiveSource', { id: sourceId });
 }
 
-/**
- * Sets the play mode of a device (e.g., shuffle, repeat).
- * @param deviceId The ID of the device (currently unused).
-@param ip The IP address of the device.
-@param mode The desired play mode.
- */
 export async function setPlayMode(deviceId: string, ip: string, mode: PlayMode): Promise<void> {
     const shuffle = mode === 'shuffle';
-    // Repeat modes are more complex and might require a different endpoint or payload
-    // For now, we only support shuffle on/off
     await beoApi.put(ip, 'BeoZone/Zone/Player/playQueue', { shuffle });
 }
 
-
-// --- Music Library Management ---
-/**
- * Retrieves the list of configured music folders from the database.
- * @returns A promise that resolves to an array of MusicFolder objects.
- */
 export async function getMusicFolders(): Promise<MusicFolder[]> {
     const db = await getDb();
     return db.musicFolders ?? [];
 }
 
-/**
- * Saves the list of music folders to the database.
- * @param folders The array of MusicFolder objects to save.
- */
 export async function saveMusicFolders(folders: MusicFolder[]): Promise<void> {
     const db = await getDb();
     db.musicFolders = folders;
     await saveDb(db);
 }
 
-/**
- * Retrieves all available tracks from the database.
- * @returns A promise that resolves to an array of Track objects.
- */
 export async function getAvailableTracks(): Promise<Track[]> {
     const db = await getDb();
     return db.tracks ?? [];
 }
 
-/**
- * Scans configured music folders for audio files, extracts metadata, and saves to the database.
- * @returns A promise that resolves to an object containing the scan status, a message, and the number of tracks found.
- */
 export async function scanMusicFolders(): Promise<{ success: boolean, message: string, count: number }> {
     console.log("Starting music folder scan...");
     const db = await getDb();
     const folders = db.musicFolders;
 
     if (!folders || folders.length === 0) {
-        return { success: true, message: "No music folders configured.", count: 0 };
+        return { success: true, message: "未配置音乐文件夹。", count: 0 };
     }
 
     const allTracks: Track[] = [];
     const supportedExtensions = ['.mp3', '.flac', '.wav', '.m4a'];
     let filesScanned = 0;
+    let metadataErrors = 0;
 
     for (const folder of folders) {
         if (!folder.path) continue;
         try {
-            const dirents = await fs.readdir(folder.path, { withFileTypes: true });
+            const dirents = await fs.readdir(folder.path, { withFileTypes: true, recursive: true });
             for (const dirent of dirents) {
                 const filePath = path.join(folder.path, dirent.name);
                 if (dirent.isFile() && supportedExtensions.includes(path.extname(dirent.name).toLowerCase())) {
                     filesScanned++;
-                    // This functionality is temporarily disabled due to build issues.
-                    // A placeholder track will be created.
-                    const track: Track = {
-                        id: `local-${randomUUID()}`,
-                        title: path.basename(filePath),
-                        artist: 'Unknown Artist',
-                        albumArtUrl: 'https://placehold.co/300x300.png',
-                        duration: 0,
-                        path: filePath,
-                    };
-                    allTracks.push(track);
+                    try {
+                        const metadata = await musicMetadata.parseFile(filePath);
+                        const track: Track = {
+                            id: `local-${randomUUID()}`,
+                            title: metadata.common.title ?? path.basename(filePath),
+                            artist: metadata.common.artist ?? '未知艺术家',
+                            albumArtUrl: 'https://placehold.co/300x300.png', 
+                            duration: metadata.format.duration ?? 0,
+                            path: filePath,
+                        };
+                        allTracks.push(track);
+                    } catch (metaError) {
+                        console.warn(`无法解析文件元数据: ${filePath}`, metaError);
+                        metadataErrors++;
+                    }
                 }
             }
         } catch (readError) {
-            console.error(`Could not read directory ${folder.path}:`, readError);
-            return { success: false, message: `Error reading folder: ${folder.path}. Please check path and permissions.`, count: 0 };
+            console.error(`无法读取目录 ${folder.path}:`, readError);
+            return { success: false, message: `读取文件夹失败: ${folder.path}。请检查路径和权限。`, count: 0 };
         }
     }
 
     db.tracks = allTracks;
     await saveDb(db);
-    console.log(`Scan complete. Scanned ${filesScanned} files and found ${allTracks.length} tracks.`);
-    return { success: true, message: `Scan complete (metadata parsing disabled). Found ${allTracks.length} tracks.`, count: allTracks.length };
+    
+    let message = `扫描完成。共找到 ${allTracks.length} 首曲目。`;
+    if (metadataErrors > 0) {
+        message += ` 有 ${metadataErrors} 个文件元数据解析失败。`;
+    }
+
+    console.log(message);
+    return { success: true, message, count: allTracks.length };
+}
+
+
+export async function getUserHomeDir(): Promise<string> {
+    return os.homedir();
 }
