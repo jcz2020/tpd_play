@@ -196,10 +196,13 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
 
   // Fetch device-specific data when the selected device changes
   React.useEffect(() => {
-    if (!selectedDevice || !isLoaded) return;
+    if (!selectedDeviceId || !isLoaded) return;
+
+    const device = devices.find(d => d.id === selectedDeviceId);
+    if (!device) return;
 
     const fetchDeviceData = async () => {
-      if (!selectedDevice.online) {
+      if (!device.online) {
         setPlaybackState({ state: "stopped", progress: 0, volume: 50, source: 'local', playMode: 'sequential', track: null });
         setAvailableSources([]);
         return;
@@ -207,15 +210,15 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
       
       try {
         const [initialState, sources] = await Promise.all([
-            getPlaybackState(selectedDevice.id, selectedDevice.ip),
-            getAvailableSources(selectedDevice.id, selectedDevice.ip),
+            getPlaybackState(device.id, device.ip),
+            getAvailableSources(device.id, device.ip),
         ]);
 
         setPlaybackState(initialState);
         setAvailableSources(sources);
 
       } catch (error) {
-        console.error(`Failed to fetch data for device ${selectedDevice.id}`, error);
+        console.error(`Failed to fetch data for device ${device.id}`, error);
         toast({ variant: "destructive", title: "Failed to get device info" });
         setPlaybackState({ state: "stopped", progress: 0, volume: 50, source: 'local', playMode: 'sequential', track: null });
         setAvailableSources([]);
@@ -224,11 +227,13 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     
     fetchDeviceData();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDevice, isLoaded]);
+  }, [selectedDeviceId, isLoaded, devices]); // Depend on devices array to refetch when a device is added/removed
 
   // Long-polling for real-time notifications
   React.useEffect(() => {
-    if (!selectedDevice || !selectedDevice.online) {
+    const device = devices.find(d => d.id === selectedDeviceId);
+
+    if (!device || !device.online || !isLoaded) {
         return;
     }
 
@@ -236,13 +241,12 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     const signal = abortController.signal;
 
     const listenForNotifications = async () => {
-        console.log(`Starting notification listener for ${selectedDevice.name}...`);
+        console.log(`Starting notification listener for ${device.name}...`);
         while (!signal.aborted) {
             try {
-                const response = await fetch(`/api/notifications/${selectedDevice.ip}`, { signal });
+                const response = await fetch(`/api/notifications/${device.ip}`, { signal });
 
                 if (response.status === 204 || signal.aborted) {
-                    // Request was aborted (client disconnect or timeout on server), just break the loop
                     break;
                 }
 
@@ -254,6 +258,8 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
 
                 const notification = await response.json();
                 
+                if (signal.aborted) break;
+
                 // Process the notification and update state
                 if (notification?.type === 'VOLUME' && notification.data?.speaker?.level) {
                     setPlaybackState(prev => ({...prev, volume: notification.data.speaker.level}));
@@ -294,21 +300,20 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
             } catch (error) {
                 if (!signal.aborted) {
                     console.error("Error in notification listener:", error);
-                    // Wait before retrying to avoid spamming requests on persistent failure
                     await new Promise(resolve => setTimeout(resolve, 5000));
                 }
             }
         }
-        console.log(`Notification listener for ${selectedDevice.name} stopped.`);
+        console.log(`Notification listener for ${device.name} stopped.`);
     };
 
     listenForNotifications();
 
     return () => {
-        console.log(`Aborting notification listener for ${selectedDevice.name}.`);
+        console.log(`Aborting notification listener for ${device.name}.`);
         abortController.abort();
     };
-  }, [selectedDevice, playbackState.track?.id]);
+  }, [selectedDeviceId, devices, isLoaded, playbackState.track?.id]);
 
 
   const handleSelectDevice = (deviceId: string) => {
@@ -497,7 +502,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     const newDevice = await addDevice(device);
     setDevices(prev => {
         // Avoid adding duplicates
-        if (prev.some(d => d.id === newDevice.id)) return prev;
+        if (prev.some(d => d.ip === newDevice.ip)) return prev;
         return [...prev, newDevice];
     });
     setSelectedDeviceId(newDevice.id);
@@ -586,6 +591,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     handlePlayModeChange,
     handleSelectPlaylist,
     handleSelectTrack,
+isLoaded,
     handleScanMusicFolders,
     handleGetUserHomeDir
   };

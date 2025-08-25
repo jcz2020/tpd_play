@@ -53,7 +53,7 @@ export function DeviceList({ devices, selectedDeviceId, onSelectDevice }: Device
                             </SidebarMenuAction>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent side="right" align="start">
-                            <DropdownMenuItem onClick={(e) => handleDelete(e, device.id)} className="text-destructive">
+                            <DropdownMenuItem key={`delete-${device.id}`} onClick={(e) => handleDelete(e, device.id)} className="text-destructive">
                                 <Trash2 />
                                 <span>Delete</span>
                             </DropdownMenuItem>
