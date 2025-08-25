@@ -18,11 +18,6 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  experimental: {
-    babel: {
-      presets: [['next/babel', {}]],
-    },
-  },
 };
 
 export default nextConfig;
