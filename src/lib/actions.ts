@@ -13,7 +13,6 @@ import { getDb, saveDb } from "./db";
 import { randomUUID } from "crypto";
 import { promises as fs } from 'fs';
 import path from 'path';
-import * as mm from 'music-metadata';
 
 // This is a mock API client. In a real application, this would be a proper
 // library for interacting with the B&O API.
@@ -122,13 +121,8 @@ export async function getDevices(): Promise<Device[]> {
   const db = await getDb();
   // For now, assume devices are online. A real app might ping them.
   const devicesWithOnlineStatus = await Promise.all(db.devices.map(async (d) => {
-    try {
-      // A simple check to see if the device is responsive.
-      const res = await fetch(`http://${d.ip}:8080/BeoDevice`, { cache: 'no-store', signal: AbortSignal.timeout(1000) });
-      return { ...d, online: res.ok };
-    } catch {
-      return { ...d, online: false };
-    }
+    const isOnline = await checkDeviceOnline(d.ip);
+    return { ...d, online: isOnline };
   }));
   return devicesWithOnlineStatus;
 }
@@ -399,20 +393,17 @@ export async function scanMusicFolders(): Promise<{ success: boolean, message: s
                 const filePath = path.join(folder.path, dirent.name);
                 if (dirent.isFile() && supportedExtensions.includes(path.extname(dirent.name).toLowerCase())) {
                     filesScanned++;
-                    try {
-                        const metadata = await mm.parseFile(filePath);
-                        const track: Track = {
-                            id: `local-${randomUUID()}`,
-                            title: metadata.common.title ?? path.basename(filePath),
-                            artist: metadata.common.artist ?? 'Unknown Artist',
-                            albumArtUrl: 'https://placehold.co/300x300.png', // Placeholder, real art is complex
-                            duration: metadata.format.duration ?? 0,
-                            path: filePath,
-                        };
-                        allTracks.push(track);
-                    } catch (metaError) {
-                        console.warn(`Could not parse metadata for ${filePath}:`, metaError);
-                    }
+                    // This functionality is temporarily disabled due to build issues.
+                    // A placeholder track will be created.
+                    const track: Track = {
+                        id: `local-${randomUUID()}`,
+                        title: path.basename(filePath),
+                        artist: 'Unknown Artist',
+                        albumArtUrl: 'https://placehold.co/300x300.png',
+                        duration: 0,
+                        path: filePath,
+                    };
+                    allTracks.push(track);
                 }
             }
         } catch (readError) {
@@ -424,5 +415,5 @@ export async function scanMusicFolders(): Promise<{ success: boolean, message: s
     db.tracks = allTracks;
     await saveDb(db);
     console.log(`Scan complete. Scanned ${filesScanned} files and found ${allTracks.length} tracks.`);
-    return { success: true, message: `Scan complete. Found ${allTracks.length} tracks.`, count: allTracks.length };
+    return { success: true, message: `Scan complete (metadata parsing disabled). Found ${allTracks.length} tracks.`, count: allTracks.length };
 }
