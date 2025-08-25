@@ -157,7 +157,7 @@ export function PlaybackControls() {
                         <Shuffle className={cn(playbackState.playMode === 'shuffle' && 'text-primary')} />
                     </Button>
                 </TooltipTrigger>
-                <TooltipContent><p key="shuffle-tooltip">Shuffle</p></TooltipContent>
+                <TooltipContent><p>Shuffle</p></TooltipContent>
             </Tooltip>
 
           <Button variant="ghost" size="icon" disabled={!isDeviceOnline || !isLocalSource} className="w-12 h-12" onClick={handlePrevTrack}>
@@ -182,7 +182,7 @@ export function PlaybackControls() {
                          <playModeInfo.Icon className={cn((playbackState.playMode === 'repeat-list' || playbackState.playMode === 'repeat-one') && 'text-primary')} />
                     </Button>
                 </TooltipTrigger>
-                <TooltipContent><p key="playmode-tooltip">{playModeInfo.label}</p></TooltipContent>
+                <TooltipContent><p>{playModeInfo.label}</p></TooltipContent>
             </Tooltip>
         </div>
 

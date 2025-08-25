@@ -45,7 +45,8 @@ import {
     getMusicFolders,
     saveMusicFolders,
     getAvailableTracks,
-    scanMusicFolders as scanDeviceMusicFolders
+    scanMusicFolders as scanDeviceMusicFolders,
+    getUserHomeDir
 } from "@/lib/actions";
 
 /**
@@ -88,6 +89,7 @@ export type AppActions = {
     handleSelectPlaylist: (playlistId: string) => void;
     handleSelectTrack: (trackId: string) => void;
     handleScanMusicFolders: () => Promise<{ success: boolean, message: string, count: number }>;
+    handleGetUserHomeDir: () => Promise<string>;
 };
 
 /**
@@ -546,6 +548,10 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     }
     return result;
   }
+  
+  const handleGetUserHomeDir = async () => {
+    return await getUserHomeDir();
+  }
 
   const state: AppState = {
     devices,
@@ -581,6 +587,7 @@ export default function AcousticHarmonyApp({ children }: { children: React.React
     handleSelectPlaylist,
     handleSelectTrack,
     handleScanMusicFolders,
+    handleGetUserHomeDir
   };
 
   return (
